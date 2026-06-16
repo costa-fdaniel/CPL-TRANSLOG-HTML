@@ -422,6 +422,22 @@ button {
   grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.8fr);
 }
 
+.contracts-layout {
+  align-items: start;
+  grid-template-columns: minmax(0, 1.18fr) minmax(360px, 0.82fr);
+}
+
+.contracts-table-wrap,
+.contract-detail-scroll {
+  max-height: calc(100vh - 190px);
+  min-height: 520px;
+  overflow: auto;
+}
+
+.contract-detail-scroll {
+  padding: 14px;
+}
+
 .transaction-form {
   display: grid;
   gap: 12px;
@@ -1235,6 +1251,12 @@ tr[data-selected="true"] {
   .contract-metrics,
   .installment-summary {
     grid-template-columns: 1fr;
+  }
+
+  .contracts-table-wrap,
+  .contract-detail-scroll {
+    max-height: 70vh;
+    min-height: 360px;
   }
 
   .wide-field {
