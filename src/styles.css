@@ -170,7 +170,7 @@ button {
 .kpi-grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(6, minmax(150px, 1fr));
+  grid-template-columns: repeat(7, minmax(128px, 1fr));
 }
 
 .kpi-grid.compact {
@@ -181,7 +181,7 @@ button {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 14px;
+  padding: 12px;
 }
 
 .kpi-label {
@@ -192,7 +192,7 @@ button {
 
 .kpi-value {
   color: var(--ink);
-  font-size: 21px;
+  font-size: 19px;
   font-weight: 700;
   line-height: 1.1;
 }
@@ -200,7 +200,7 @@ button {
 .panel-summary {
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(300px, 1.4fr) repeat(3, minmax(150px, 0.55fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .panel-filter-bar {
@@ -229,8 +229,8 @@ button {
   border-radius: 8px;
   display: grid;
   gap: 6px;
-  min-height: 96px;
-  padding: 16px;
+  min-height: 86px;
+  padding: 14px;
 }
 
 .summary-hero {
@@ -248,19 +248,19 @@ button {
 
 .summary-hero strong {
   color: var(--ink);
-  font-size: 30px;
+  font-size: 24px;
   line-height: 1.05;
 }
 
 .summary-hero small {
   color: var(--green);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
 }
 
 .summary-tile strong {
   color: var(--ink);
-  font-size: 24px;
+  font-size: 22px;
   line-height: 1.1;
 }
 
