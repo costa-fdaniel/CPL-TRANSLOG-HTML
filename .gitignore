@@ -1,0 +1,14 @@
+# Local financial source files and generated extracts.
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Temporary workbook copies used during analysis.
+_tmp_*.xlsb
+_tmp_*.xlsx
+
+# Python cache.
+__pycache__/
+*.pyc
+

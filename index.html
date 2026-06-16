@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CPL TRANSLOG HTML</title>
+    <link rel="stylesheet" href="src/styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="topbar-inner">
+          <div class="brand">
+            <div class="brand-title">CPL TRANSLOG HTML</div>
+            <div class="brand-subtitle">Contratos, operacoes financeiras, lancamentos e auditoria</div>
+          </div>
+          <div class="toolbar">
+            <label class="file-control" title="Carregar JSON processado">
+              <span>Carregar JSON</span>
+              <input id="fileInput" type="file" accept="application/json,.json">
+            </label>
+            <input id="searchInput" class="search" type="search" placeholder="Buscar contrato, ID, tipo ou comentario">
+            <select id="statusFilter" class="select" aria-label="Status">
+              <option value="all">Todos os status</option>
+              <option value="ativo">Ativos</option>
+              <option value="quitado">Quitados</option>
+            </select>
+            <select id="entityFilter" class="select" aria-label="Empresa">
+              <option value="all">SAGA + TLOG</option>
+              <option value="SAGA">SAGA</option>
+              <option value="TLOG">TLOG</option>
+            </select>
+          </div>
+        </div>
+      </header>
+
+      <main class="content">
+        <div id="statusLine" class="status-line">Carregando dados...</div>
+
+        <section id="kpis" class="kpi-grid"></section>
+
+        <section class="grid-two">
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Fluxo mensal previsto</div>
+            </div>
+            <div class="panel-body">
+              <div id="monthlyChart" class="chart"></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Contrato selecionado</div>
+            </div>
+            <div id="contractDetail" class="panel-body"></div>
+          </div>
+        </section>
+
+        <section class="grid-two">
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Contratos</div>
+            </div>
+            <div class="table-wrap">
+              <table id="contractsTable">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Contrato</th>
+                    <th>Empresa</th>
+                    <th>Status</th>
+                    <th>Tipo</th>
+                    <th>Divida final</th>
+                    <th>Juros</th>
+                    <th>Comentario</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Auditoria</div>
+            </div>
+            <div class="panel-body">
+              <div id="auditList" class="audit-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Regras de movimentos monitoradas</div>
+          </div>
+          <div class="table-wrap">
+            <table id="rulesTable">
+              <thead>
+                <tr>
+                  <th>Coluna</th>
+                  <th>Regra</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="src/dashboard.js"></script>
+  </body>
+</html>
+
