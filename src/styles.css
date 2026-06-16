@@ -565,6 +565,15 @@ tr[data-selected="true"] {
   color: var(--amber);
 }
 
+.pill-danger {
+  background: #fef2f2;
+  color: var(--red);
+}
+
+.batch-error {
+  background: #fff5f5;
+}
+
 .source-column {
   color: var(--muted);
   font-size: 11px;

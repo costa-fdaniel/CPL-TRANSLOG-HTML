@@ -59,6 +59,26 @@ As colunas de lancamento sao identificadas pelo cabecalho de cada aba. Quando um
 6. Clique em `Adicionar a esteira`.
 7. Use a aba `Lancamentos` para filtrar, selecionar e exportar o CSV.
 
+## Importacao em lote
+
+Na aba `Transacoes`, use `Baixar modelo CSV` para gerar o arquivo padrao de importacao em lote. Depois preencha e importe o CSV em `Importar CSV`.
+
+Colunas aceitas:
+
+```text
+tipo;contrato_id;data;parcelas;valor;debito;credito;quitou;alvo;direcao;observacao
+```
+
+Tipos aceitos em `tipo`:
+
+- `pagamento`: paga uma ou mais parcelas, usando `parcelas` como `48`, `45,46,47` ou `41-45`.
+- `quitacao`: baixa parcelas selecionadas e marca a linha como quitacao para conferencia.
+- `manual`: usa `debito`, `credito` e `valor` informados no CSV.
+- `ajuste_juros`: gera ajuste de juros por `valor`, `alvo` e `direcao`.
+- `ajuste_passivo`: gera ajuste do passivo por `valor`, `alvo` e `direcao`.
+
+O importador valida contrato, data, parcelas, valores e contas antes de adicionar na esteira. Linhas com erro ficam na previa e nao entram em `Adicionar validos`.
+
 O dashboard gera uma previa com as colunas esperadas pelo arquivo de importacao contabil:
 
 ```text

@@ -7,6 +7,7 @@ const state = {
   selectedInstallmentKeys: new Set(),
   manualEntries: [],
   transactionDraftEntries: [],
+  batchImportRows: [],
 };
 
 const MANUAL_STORAGE_KEY = "cpl-translog-html-manual-entries";
@@ -81,6 +82,12 @@ const els = {
   manualTransactionsTable: document.querySelector("#manualTransactionsTable tbody"),
   exportManualLayerButton: document.querySelector("#exportManualLayerButton"),
   clearManualLayerButton: document.querySelector("#clearManualLayerButton"),
+  downloadBatchTemplateButton: document.querySelector("#downloadBatchTemplateButton"),
+  batchCsvInput: document.querySelector("#batchCsvInput"),
+  addBatchEntriesButton: document.querySelector("#addBatchEntriesButton"),
+  clearBatchImportButton: document.querySelector("#clearBatchImportButton"),
+  batchImportSummary: document.querySelector("#batchImportSummary"),
+  batchImportTable: document.querySelector("#batchImportTable tbody"),
 };
 
 function escapeHtml(value) {
@@ -102,12 +109,26 @@ function fmtDateBr(date) {
   return `${day}/${month}/${year}`;
 }
 
+function normalizeDate(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!match) return "";
+  const [, day, month, year] = match;
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+}
+
 function fmtValueBr(value) {
   return Number(value || 0).toFixed(2).replace(".", ",");
 }
 
 function removeAccents(value) {
   return String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function normalizeKey(value) {
+  return removeAccents(value).trim().toLowerCase();
 }
 
 function parseAmount(value) {
@@ -198,6 +219,14 @@ function loadManualEntries() {
 function selectedTransactionContract() {
   const id = Number(els.transactionContractSelect.value);
   return state.data?.contracts.find((contract) => contract.id === id) || null;
+}
+
+function contractByInput(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+  return state.data?.contracts.find((contract) => (
+    String(contract.id) === text || String(contract.contractNumber) === text
+  )) || null;
 }
 
 function syncTransactionContractToSelected() {
@@ -466,6 +495,8 @@ function renderEmpty() {
   els.manualTransactionsTable.innerHTML = "";
   els.paymentInstallmentSummary.innerHTML = "";
   els.paymentInstallmentsTable.innerHTML = "";
+  els.batchImportSummary.innerHTML = "";
+  els.batchImportTable.innerHTML = "";
   els.transactionExplanation.innerHTML = "";
   els.transactionContractSnapshot.innerHTML = "";
 }
@@ -898,10 +929,11 @@ function actionExplanation(action) {
   }[action] || "";
 }
 
-function simulateSelectedInstallmentPayments(contract, action, selectedInstallments) {
-  const paymentDate = els.transactionDateInput.value;
-  const settled = els.transactionSettledSelect.value;
-  const note = els.transactionNoteInput.value.trim();
+function simulateSelectedInstallmentPayments(contract, action, selectedInstallments, options = {}) {
+  const paymentDate = options.date ?? els.transactionDateInput.value;
+  const settled = options.settled ?? els.transactionSettledSelect.value;
+  const note = options.note ?? els.transactionNoteInput.value.trim();
+  const sourceColumn = options.sourceColumn || "HTML";
   const entries = [];
   selectedInstallments.forEach((installment) => {
     const date = paymentDate || installment.date;
@@ -921,6 +953,7 @@ function simulateSelectedInstallmentPayments(contract, action, selectedInstallme
         description: `${baseDescription} - principal${noteText}`,
         issues,
         parcel: installment.parcel,
+        sourceColumn,
         extra: {
           installmentKey: installment.key,
           installmentDueDate: installment.date,
@@ -940,6 +973,7 @@ function simulateSelectedInstallmentPayments(contract, action, selectedInstallme
         description: `${baseDescription} - juros${noteText}`,
         issues,
         parcel: installment.parcel,
+        sourceColumn,
         extra: {
           installmentKey: installment.key,
           installmentDueDate: installment.date,
@@ -1071,6 +1105,7 @@ function renderTransactionPanel() {
   renderPaymentInstallments();
   renderTransactionSimulation();
   renderManualTransactions();
+  renderBatchImport();
 }
 
 function renderPaymentInstallments() {
@@ -1134,6 +1169,238 @@ function renderManualTransactions() {
     .sort((a, b) => b.date.localeCompare(a.date))
     .map((entry) => ledgerRowCells(entry, false))
     .join("") || `<tr><td colspan="9" class="empty-cell">Nenhuma transacao adicionada nesta camada local.</td></tr>`;
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let field = "";
+  let quoted = false;
+  const normalized = String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  for (let index = 0; index < normalized.length; index += 1) {
+    const char = normalized[index];
+    const next = normalized[index + 1];
+    if (char === "\"") {
+      if (quoted && next === "\"") {
+        field += "\"";
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (char === ";" && !quoted) {
+      row.push(field);
+      field = "";
+    } else if (char === "\n" && !quoted) {
+      row.push(field);
+      if (row.some((cell) => String(cell).trim())) rows.push(row);
+      row = [];
+      field = "";
+    } else {
+      field += char;
+    }
+  }
+  row.push(field);
+  if (row.some((cell) => String(cell).trim())) rows.push(row);
+  return rows;
+}
+
+function parseCsvObjects(text) {
+  const rows = parseCsv(text);
+  const headers = (rows.shift() || []).map((header) => normalizeKey(header));
+  return rows.map((row, index) => ({
+    line: index + 2,
+    raw: headers.reduce((acc, header, colIndex) => {
+      acc[header] = String(row[colIndex] ?? "").trim();
+      return acc;
+    }, {}),
+  }));
+}
+
+function parseParcelSpec(spec) {
+  const text = String(spec ?? "").trim();
+  if (!text) return [];
+  const result = new Set();
+  text.split(",").map((item) => item.trim()).filter(Boolean).forEach((part) => {
+    const range = part.match(/^(\d+)\s*-\s*(\d+)$/);
+    if (range) {
+      const start = Number(range[1]);
+      const end = Number(range[2]);
+      const min = Math.min(start, end);
+      const max = Math.max(start, end);
+      for (let value = min; value <= max; value += 1) result.add(value);
+    } else {
+      const value = Number(part);
+      if (Number.isFinite(value)) result.add(value);
+    }
+  });
+  return [...result];
+}
+
+function targetFromScope(contract, scope, action) {
+  return scopeTargets(contract, scope || "current", action)[0] || scopeTargets(contract, "current", action)[0];
+}
+
+function makeBatchAdjustmentEntries(contract, row, type, date, amount, note) {
+  const scope = normalizeKey(row.alvo || "current").replace("circulante", "current").replace("nao current", "non_current").replace("nao_circulante", "non_current");
+  const normalizedScope = ["current", "non_current", "both"].includes(scope) ? scope : "current";
+  const direction = normalizeKey(row.direcao || "increase").includes("redu") ? "decrease" : "increase";
+  const action = type === "ajuste_juros" ? "interest_adjustment" : "liability_adjustment";
+  const targets = scopeTargets(contract, normalizedScope, action);
+  const resultAccount = resultAccountFor(contract);
+  const entries = [];
+  targets.forEach((target) => {
+    const value = targets.length > 1 ? amount * target.weight : amount;
+    if (!value) return;
+    let debit = "";
+    let credit = "";
+    let rule = "";
+    if (action === "interest_adjustment") {
+      if (direction === "increase") {
+        debit = resultAccount;
+        credit = target.interestAccount;
+        rule = "CSV-JUROS+";
+      } else {
+        debit = target.interestAccount;
+        credit = resultAccount;
+        rule = "CSV-JUROS-";
+      }
+    } else if (direction === "increase") {
+      debit = "AAA";
+      credit = target.principalAccount;
+      rule = "CSV-PASSIVO+";
+    } else {
+      debit = target.principalAccount;
+      credit = "AAA";
+      rule = "CSV-PASSIVO-";
+    }
+    entries.push(makeManualEntry({
+      contract,
+      date,
+      debit,
+      credit,
+      amount: value,
+      rule,
+      description: `${type === "ajuste_juros" ? "Ajuste de juros" : "Ajuste do passivo"} ${target.label} via CSV ref. contrato ${contract.contractNumber} aba (${contract.id})${note ? ` - ${note}` : ""}`,
+      sourceColumn: "CSV",
+    }));
+  });
+  return entries;
+}
+
+function buildBatchEntries(row) {
+  const data = row.raw;
+  const type = normalizeKey(data.tipo || data.acao);
+  const contract = contractByInput(data.contrato_id || data.contrato || data.id);
+  const date = normalizeDate(data.data || data.data_pagamento);
+  const note = data.observacao || data.historico || "";
+  const settled = (data.quitou || "N").trim().toUpperCase() === "S" ? "S" : "N";
+  const amount = parseAmount(data.valor || data.valor_total);
+  const errors = [];
+  let entries = [];
+
+  if (!type) errors.push("Tipo/acao nao informado.");
+  if (!contract) errors.push("Contrato nao encontrado.");
+  if (!date) errors.push("Data invalida ou ausente.");
+
+  if (errors.length || !contract) {
+    return { ...row, type, contract, entries, status: "erro", message: errors.join(" ") };
+  }
+
+  if (["pagamento", "payment", "quitacao", "settlement"].includes(type)) {
+    const action = ["quitacao", "settlement"].includes(type) ? "settlement" : "payment";
+    const requestedParcels = parseParcelSpec(data.parcelas || data.parcela);
+    if (requestedParcels.length) {
+      const installments = contractInstallments(contract);
+      const selected = requestedParcels
+        .map((parcel) => installments.find((item) => Number(item.parcel) === parcel))
+        .filter(Boolean);
+      const missing = requestedParcels.filter((parcel) => !selected.some((item) => Number(item.parcel) === parcel));
+      const blocked = selected.filter((item) => item.status === "paga" || item.status === "na esteira");
+      if (missing.length) errors.push(`Parcela(s) inexistente(s): ${missing.join(", ")}.`);
+      if (blocked.length) errors.push(`Parcela(s) indisponivel(is): ${blocked.map((item) => item.parcel).join(", ")}.`);
+      entries = simulateSelectedInstallmentPayments(contract, action, selected.filter((item) => item.status === "pendente" || item.status === "selecionada"), {
+        date,
+        settled,
+        note,
+        sourceColumn: "CSV",
+      });
+    } else if (amount > 0) {
+      const target = targetFromScope(contract, data.alvo, action);
+      entries = [makeManualEntry({
+        contract,
+        date,
+        debit: target.principalAccount,
+        credit: "000",
+        amount,
+        rule: action === "settlement" ? "CSV-QUITACAO" : "CSV-PGTO",
+        description: `${action === "settlement" ? "Quitacao" : "Pagamento"} via CSV ref. contrato ${contract.contractNumber} aba (${contract.id})${note ? ` - ${note}` : ""}`,
+        issues: settled === "S" ? ["Quitou = S; conferir se a baixa liquida o saldo do contrato"] : [],
+        sourceColumn: "CSV",
+      })];
+    } else {
+      errors.push("Informe parcelas ou valor para pagamento/quitacao.");
+    }
+  } else if (["manual", "lancamento_manual"].includes(type)) {
+    if (!data.debito) errors.push("Debito manual ausente.");
+    if (!data.credito) errors.push("Credito manual ausente.");
+    if (amount <= 0) errors.push("Valor manual invalido.");
+    if (!errors.length) {
+      entries = [makeManualEntry({
+        contract,
+        date,
+        debit: data.debito,
+        credit: data.credito,
+        amount,
+        rule: "CSV-MANUAL",
+        description: `Lancamento manual via CSV ref. contrato ${contract.contractNumber} aba (${contract.id})${note ? ` - ${note}` : ""}`,
+        sourceColumn: "CSV",
+      })];
+    }
+  } else if (["ajuste_juros", "interest_adjustment", "ajuste_passivo", "liability_adjustment"].includes(type)) {
+    if (amount <= 0) errors.push("Valor de ajuste invalido.");
+    if (!errors.length) {
+      const normalizedType = type.includes("juros") || type.includes("interest") ? "ajuste_juros" : "ajuste_passivo";
+      entries = makeBatchAdjustmentEntries(contract, data, normalizedType, date, amount, note);
+    }
+  } else {
+    errors.push(`Tipo nao reconhecido: ${type}.`);
+  }
+
+  if (!entries.length && !errors.length) errors.push("Nenhum lancamento gerado.");
+  return {
+    ...row,
+    type,
+    contract,
+    entries,
+    status: errors.length ? "erro" : entries.some((entry) => entry.reviewStatus === "revisar") ? "revisar" : "pronto",
+    message: errors.join(" ") || "Pronto para adicionar.",
+  };
+}
+
+function renderBatchImport() {
+  const rows = state.batchImportRows;
+  const validRows = rows.filter((row) => row.status !== "erro");
+  const entries = validRows.flatMap((row) => row.entries);
+  els.batchImportSummary.innerHTML = `
+    <div class="summary-metric"><span>Linhas</span><strong>${rows.length}</strong></div>
+    <div class="summary-metric"><span>Validas</span><strong>${validRows.length}</strong></div>
+    <div class="summary-metric"><span>Com erro</span><strong>${rows.length - validRows.length}</strong></div>
+    <div class="summary-metric"><span>Lancamentos</span><strong>${entries.length}</strong></div>
+    <div class="summary-metric"><span>A revisar</span><strong>${entries.filter((entry) => entry.reviewStatus === "revisar").length}</strong></div>
+    <div class="summary-metric"><span>Valor</span><strong>${fmtMoney(sum(entries, (entry) => entry.amount), true)}</strong></div>
+  `;
+  els.batchImportTable.innerHTML = rows.map((row) => `
+    <tr class="${row.status === "erro" ? "batch-error" : ""}">
+      <td>${row.line}</td>
+      <td>${escapeHtml(row.type || "-")}</td>
+      <td>${row.contract ? `${row.contract.id} - ${escapeHtml(row.contract.contractNumber)}` : "-"}</td>
+      <td>${escapeHtml(row.raw.parcelas || row.raw.parcela || "-")}</td>
+      <td>${row.entries.length ? fmtMoney(sum(row.entries, (entry) => entry.amount), true) : escapeHtml(row.raw.valor || row.raw.valor_total || "-")}</td>
+      <td>${row.entries.length}</td>
+      <td><span class="pill ${row.status === "erro" ? "pill-danger" : row.status === "revisar" ? "pill-warning" : "pill-active"}">${escapeHtml(row.status)}</span></td>
+      <td>${escapeHtml(row.message)}</td>
+    </tr>
+  `).join("") || `<tr><td colspan="8" class="empty-cell">Importe um CSV para validar os lancamentos em lote.</td></tr>`;
 }
 
 function ledgerRowCells(entry, withCheck = true) {
@@ -1283,6 +1550,68 @@ function clearInstallmentSelection() {
   renderDetail();
 }
 
+function downloadTextFile(filename, content, type = "text/plain;charset=utf-8") {
+  const blob = new Blob(["\uFEFF" + content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function downloadBatchTemplate() {
+  const rows = [
+    ["tipo", "contrato_id", "data", "parcelas", "valor", "debito", "credito", "quitou", "alvo", "direcao", "observacao"],
+    ["pagamento", "2", "2026-06-20", "48", "", "", "", "N", "current", "", "Pagamento de parcela"],
+    ["pagamento", "108", "2026-07-10", "45,46,47", "", "", "", "N", "current", "", "Pagamento de varias parcelas"],
+    ["quitacao", "136", "2026-06-30", "41-45", "", "", "", "S", "current", "", "Quitacao por parcelas"],
+    ["ajuste_juros", "157", "2026-06-30", "", "1500,00", "", "", "N", "both", "increase", "Ajuste de juros"],
+    ["ajuste_passivo", "157", "2026-06-30", "", "1000,00", "", "", "N", "current", "decrease", "Ajuste do passivo"],
+    ["manual", "2", "2026-06-20", "", "95316,10", "7543", "000", "N", "", "", "Lancamento manual"],
+  ];
+  downloadTextFile("cpl-translog-modelo-importacao-lote.csv", rows.map((row) => row.join(";")).join("\r\n"), "text/csv;charset=utf-8");
+}
+
+async function handleBatchCsvImport(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const text = await file.text();
+  state.batchImportRows = parseCsvObjects(text).map(buildBatchEntries);
+  renderBatchImport();
+}
+
+function addBatchEntriesToLedger() {
+  const entries = state.batchImportRows
+    .filter((row) => row.status !== "erro")
+    .flatMap((row) => row.entries)
+    .map((entry) => ({
+      ...entry,
+      id: `manual-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    }));
+  if (!entries.length) {
+    renderBatchImport();
+    return;
+  }
+  entries.forEach((entry) => state.selectedLedgerIds.add(entry.id));
+  state.manualEntries.push(...entries);
+  state.batchImportRows = [];
+  if (els.batchCsvInput) els.batchCsvInput.value = "";
+  saveManualEntries();
+  els.ledgerReadyFilter.value = "all";
+  populateLedgerControls();
+  applyLedgerFilters();
+  render();
+}
+
+function clearBatchImport() {
+  state.batchImportRows = [];
+  if (els.batchCsvInput) els.batchCsvInput.value = "";
+  renderBatchImport();
+}
+
 function switchTab(tabName) {
   els.tabs.forEach((button) => button.classList.toggle("active", button.dataset.tab === tabName));
   els.tabPanels.forEach((panel) => panel.classList.toggle("active", panel.id === `${tabName}Tab`));
@@ -1391,5 +1720,9 @@ els.clearManualLayerButton.addEventListener("click", clearManualLayer);
 els.selectNextInstallmentButton.addEventListener("click", selectNextInstallment);
 els.selectAllPendingInstallmentsButton.addEventListener("click", selectAllPendingInstallments);
 els.clearInstallmentSelectionButton.addEventListener("click", clearInstallmentSelection);
+els.downloadBatchTemplateButton.addEventListener("click", downloadBatchTemplate);
+els.batchCsvInput.addEventListener("change", handleBatchCsvImport);
+els.addBatchEntriesButton.addEventListener("click", addBatchEntriesToLedger);
+els.clearBatchImportButton.addEventListener("click", clearBatchImport);
 
 loadDefaultData();

@@ -256,6 +256,41 @@
               </table>
             </div>
           </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Importacao em lote</div>
+              <div class="action-row">
+                <button id="downloadBatchTemplateButton" class="button secondary">Baixar modelo CSV</button>
+                <label class="file-control">
+                  <span>Importar CSV</span>
+                  <input id="batchCsvInput" type="file" accept=".csv,text/csv">
+                </label>
+                <button id="addBatchEntriesButton" class="button primary">Adicionar validos</button>
+                <button id="clearBatchImportButton" class="button secondary">Limpar importacao</button>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div id="batchImportSummary" class="installment-summary"></div>
+            </div>
+            <div class="table-wrap ledger-wrap">
+              <table id="batchImportTable">
+                <thead>
+                  <tr>
+                    <th>Linha</th>
+                    <th>Tipo</th>
+                    <th>Contrato</th>
+                    <th>Parcelas</th>
+                    <th>Valor</th>
+                    <th>Lancamentos</th>
+                    <th>Status</th>
+                    <th>Mensagem</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
         </section>
 
         <section id="ledgerTab" class="tab-panel">
