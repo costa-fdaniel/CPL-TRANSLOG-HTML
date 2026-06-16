@@ -263,9 +263,9 @@ function manualImpactFor(contract) {
       const rule = String(entry.rule || "");
 
       if (entry.installmentComponent === "principal") {
-        impact.currentPrincipal -= amount;
+        impact.currentPrincipal += entry.installmentAdjustment === "reversal" ? amount : -amount;
       } else if (entry.installmentComponent === "juros") {
-        impact.currentInterest -= amount;
+        impact.currentInterest += entry.installmentAdjustment === "reversal" ? amount : -amount;
       } else if ((rule.includes("PGTO") || rule.includes("QUITACAO")) && credit === "000") {
         if (debit === contract.accounts.naoCirc) impact.nonCurrentPrincipal -= amount;
         if (debit === contract.accounts.circ) impact.currentPrincipal -= amount;
@@ -449,6 +449,15 @@ function contractInstallmentStats(contract) {
 
 function selectedPaymentInstallments(contract) {
   return contractInstallments(contract).filter((item) => item.status === "selecionada");
+}
+
+function selectedInstallmentsByKey(contract) {
+  return contractInstallments(contract).filter((item) => state.selectedInstallmentKeys.has(item.key));
+}
+
+function scaledInstallmentAmount(value, installment, selectedTotal) {
+  if (!value || selectedTotal <= 0) return value;
+  return value * (installment.total / selectedTotal);
 }
 
 async function loadDefaultData() {
@@ -1225,6 +1234,7 @@ function transactionDescription(action, contract, target, note, settled) {
 function actionExplanation(action) {
   return {
     payment: "Registra pagamento ou amortizacao contra a conta do passivo e a conta 000. Se houver parcelas selecionadas, usa exatamente essas parcelas; sem selecao, usa o valor livre do formulario.",
+    paid_installment_adjustment: "Ajusta uma parcela que ja consta como paga sem apagar o historico. Selecione parcelas pagas; direcao Aumenta estorna o pagamento e reabre saldo, direcao Reduz gera uma baixa complementar.",
     interest_adjustment: "Gera ajuste de juros contra a conta de resultado do contrato. Leasing usa 4773; os demais usam 375. A direcao define se aumenta ou reduz o juros/redutora.",
     liability_adjustment: "Gera ajuste no passivo circulante ou nao circulante. Usa a conta ponte AAA e por isso fica marcado como revisar antes da importacao.",
     settlement: "Registra baixa/quitacao do contrato no alvo escolhido. Se houver parcelas selecionadas, baixa essas parcelas; se o valor ficar vazio, usa o saldo final do alvo quando existir.",
@@ -1238,7 +1248,7 @@ function toggleTransactionFields() {
     amount: true,
     installments: ["payment", "settlement"].includes(action),
     scope: ["payment", "settlement", "interest_adjustment", "liability_adjustment"].includes(action),
-    direction: ["interest_adjustment", "liability_adjustment"].includes(action),
+    direction: ["paid_installment_adjustment", "interest_adjustment", "liability_adjustment"].includes(action),
     manual: action === "custom",
   };
   document.querySelectorAll("[data-field]").forEach((field) => {
@@ -1303,6 +1313,64 @@ function simulateSelectedInstallmentPayments(contract, action, selectedInstallme
   return entries;
 }
 
+function simulatePaidInstallmentAdjustment(contract, selectedInstallments) {
+  const adjustmentDate = els.transactionDateInput.value || todayIso();
+  const direction = els.transactionDirectionSelect.value;
+  const note = els.transactionNoteInput.value.trim();
+  const amountInput = parseAmount(els.transactionAmountInput.value);
+  const selectedTotal = sum(selectedInstallments, (item) => item.total);
+  const noteText = note ? ` - ${note}` : "";
+  const isReversal = direction === "increase";
+  const entries = [];
+
+  selectedInstallments.forEach((installment) => {
+    const targetTotal = scaledInstallmentAmount(amountInput, installment, selectedTotal) || installment.total;
+    const principal = installment.total > 0 ? targetTotal * (installment.principal / installment.total) : 0;
+    const interest = installment.total > 0 ? targetTotal * (installment.interest / installment.total) : 0;
+    const baseDescription = `${isReversal ? "Estorno" : "Complemento"} de parcela paga ${installment.parcel} venc. ${fmtDateBr(installment.date)} ref. contrato ${contract.contractNumber} aba (${contract.id})`;
+
+    if (principal > 0.005) {
+      entries.push(makeManualEntry({
+        contract,
+        date: adjustmentDate,
+        debit: isReversal ? "000" : contract.accounts.circ,
+        credit: isReversal ? contract.accounts.circ : "000",
+        amount: principal,
+        rule: isReversal ? "TX-ESTORNO-PARC-PRINC" : "TX-COMP-PARC-PRINC",
+        description: `${baseDescription} - principal${noteText}`,
+        parcel: installment.parcel,
+        extra: {
+          installmentKey: installment.key,
+          installmentDueDate: installment.date,
+          installmentComponent: "principal",
+          installmentAdjustment: isReversal ? "reversal" : "complement",
+        },
+      }));
+    }
+
+    if (interest > 0.005) {
+      entries.push(makeManualEntry({
+        contract,
+        date: adjustmentDate,
+        debit: isReversal ? "000" : contract.accounts.circ,
+        credit: isReversal ? contract.accounts.circ : "000",
+        amount: interest,
+        rule: isReversal ? "TX-ESTORNO-PARC-JUROS" : "TX-COMP-PARC-JUROS",
+        description: `${baseDescription} - juros${noteText}`,
+        parcel: installment.parcel,
+        extra: {
+          installmentKey: installment.key,
+          installmentDueDate: installment.date,
+          installmentComponent: "juros",
+          installmentAdjustment: isReversal ? "reversal" : "complement",
+        },
+      }));
+    }
+  });
+
+  return entries;
+}
+
 function simulateTransaction() {
   const contract = selectedTransactionContract();
   if (!contract) return [];
@@ -1320,9 +1388,15 @@ function simulateTransaction() {
     ? [{ scope: "custom", label: "Manual", weight: 1, principalAccount: "", interestAccount: "" }]
     : scopeTargets(contract, scope, action);
   const selectedInstallments = selectedPaymentInstallments(contract);
+  const selectedByKey = selectedInstallmentsByKey(contract);
 
   if ((action === "payment" || action === "settlement") && selectedInstallments.length) {
     return simulateSelectedInstallmentPayments(contract, action, selectedInstallments);
+  }
+
+  if (action === "paid_installment_adjustment") {
+    const paidSelected = selectedByKey.filter((item) => item.status === "paga");
+    return paidSelected.length ? simulatePaidInstallmentAdjustment(contract, paidSelected) : [];
   }
 
   if (!date || (!amountInput && action !== "settlement")) {
@@ -1434,19 +1508,27 @@ function renderPaymentInstallments() {
     els.paymentInstallmentsTable.innerHTML = "";
     return;
   }
+  const action = els.transactionActionSelect.value;
   const stats = contractInstallmentStats(contract);
   const rows = stats.installments;
+  const selectedRows = selectedInstallmentsByKey(contract);
+  const selectedCount = action === "paid_installment_adjustment" ? selectedRows.length : stats.selected;
+  const selectedAmount = action === "paid_installment_adjustment"
+    ? sum(selectedRows, (item) => item.total)
+    : stats.selectedAmount;
   els.paymentInstallmentSummary.innerHTML = `
     <div class="summary-metric"><span>Total parcelas</span><strong>${stats.total || rows.length}</strong></div>
     <div class="summary-metric"><span>Pagas</span><strong>${stats.paid}</strong></div>
     <div class="summary-metric"><span>Pendentes</span><strong>${stats.pending}</strong></div>
-    <div class="summary-metric"><span>Selecionadas</span><strong>${stats.selected}</strong></div>
+    <div class="summary-metric"><span>Selecionadas</span><strong>${selectedCount}</strong></div>
     <div class="summary-metric"><span>Ficarao pendentes</span><strong>${stats.pendingAfterSelection}</strong></div>
-    <div class="summary-metric"><span>Total selecionado</span><strong>${fmtMoney(stats.selectedAmount, true)}</strong></div>
+    <div class="summary-metric"><span>Total selecionado</span><strong>${fmtMoney(selectedAmount, true)}</strong></div>
   `;
 
   els.paymentInstallmentsTable.innerHTML = rows.map((item) => {
-    const selectable = item.status === "pendente" || item.status === "selecionada";
+    const selectable = action === "paid_installment_adjustment"
+      ? item.status === "paga"
+      : item.status === "pendente" || item.status === "selecionada";
     const checked = state.selectedInstallmentKeys.has(item.key);
     return `
       <tr class="installment-row ${item.status.replace(/\s+/g, "-")}">
@@ -1852,12 +1934,17 @@ function clearManualLayer() {
 }
 
 function selectableInstallments(contract) {
-  return contractInstallments(contract).filter((item) => item.status === "pendente" || item.status === "selecionada");
+  const action = els.transactionActionSelect.value;
+  return contractInstallments(contract).filter((item) => (
+    action === "paid_installment_adjustment"
+      ? item.status === "paga"
+      : item.status === "pendente" || item.status === "selecionada"
+  ));
 }
 
 function selectNextInstallment() {
   const contract = selectedTransactionContract();
-  const next = selectableInstallments(contract).find((item) => item.status === "pendente");
+  const next = selectableInstallments(contract).find((item) => !state.selectedInstallmentKeys.has(item.key));
   if (next) {
     state.selectedInstallmentKeys.add(next.key);
   }
@@ -2028,6 +2115,8 @@ els.exportLedgerButton.addEventListener("click", exportLedgerCsv);
       renderContractsTable();
       renderDetail();
       renderAudit();
+    } else if (control === els.transactionActionSelect) {
+      state.selectedInstallmentKeys.clear();
     }
     state.transactionDraftEntries = simulateTransaction();
     renderTransactionPanel();
