@@ -197,6 +197,94 @@ button {
   line-height: 1.1;
 }
 
+.panel-summary {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(300px, 1.4fr) repeat(3, minmax(150px, 0.55fr));
+}
+
+.summary-hero,
+.summary-tile {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  min-height: 96px;
+  padding: 16px;
+}
+
+.summary-hero {
+  background: linear-gradient(135deg, #ffffff 0%, #eef7f5 100%);
+  border-color: #cfe7e1;
+}
+
+.summary-hero span,
+.summary-tile span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.summary-hero strong {
+  color: var(--ink);
+  font-size: 30px;
+  line-height: 1.05;
+}
+
+.summary-hero small {
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.summary-tile strong {
+  color: var(--ink);
+  font-size: 24px;
+  line-height: 1.1;
+}
+
+.workflow-strip {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 10px;
+}
+
+.workflow-strip div {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #e6edf5;
+  border-radius: 6px;
+  display: flex;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 10px;
+}
+
+.workflow-strip strong {
+  align-items: center;
+  background: var(--ink);
+  border-radius: 999px;
+  color: #ffffff;
+  display: inline-flex;
+  flex: 0 0 24px;
+  height: 24px;
+  justify-content: center;
+  width: 24px;
+}
+
+.workflow-strip span {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
 .dashboard-grid {
   display: grid;
   gap: 18px;
@@ -267,6 +355,10 @@ button {
   display: grid;
   font-size: 12px;
   gap: 6px;
+}
+
+.transaction-form .field-hidden {
+  display: none;
 }
 
 .transaction-form textarea {
@@ -794,6 +886,7 @@ tr[data-selected="true"] {
 @media (max-width: 1180px) {
   .kpi-grid,
   .kpi-grid.compact,
+  .panel-summary,
   .dashboard-grid,
   .dashboard-grid.compact,
   .grid-two {
@@ -810,6 +903,10 @@ tr[data-selected="true"] {
 
   .installment-summary {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .workflow-strip {
+    grid-template-columns: 1fr;
   }
 
   .wide-field {
@@ -840,6 +937,7 @@ tr[data-selected="true"] {
 
   .kpi-grid,
   .kpi-grid.compact,
+  .panel-summary,
   .dashboard-grid,
   .dashboard-grid.compact,
   .grid-two,

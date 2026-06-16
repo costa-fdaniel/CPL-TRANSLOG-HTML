@@ -7,10 +7,11 @@ Dashboard HTML para acompanhamento dos contratos financeiros da TRANSLOG/SAGA/TL
 - saldos circulante e nao circulante;
 - juros do ano;
 - movimentos que alimentam lancamentos contabeis;
-- auditoria de regras e alertas de atualizacao.
+- auditoria de regras e alertas de atualizacao;
 - esteira de lancamentos com filtros por ano, periodo, contrato, regra, empresa e situacao;
-- exportacao CSV dos lancamentos selecionados ou filtrados.
-- simulacao de transacoes no HTML, com acoes de pagamento, ajuste de juros, ajuste de passivo, quitacao e lancamento manual.
+- exportacao CSV dos lancamentos selecionados ou filtrados;
+- simulacao e registro de transacoes no HTML, com acoes de pagamento, ajuste de juros, ajuste de passivo, quitacao e lancamento manual;
+- atualizacao visual dos saldos dos contratos a partir dos lancamentos feitos/importados no proprio sistema.
 
 ## Como atualizar os dados
 
@@ -49,15 +50,16 @@ O extrator usa a planilha como fonte dos calculos: ele le os valores calculados 
 
 As colunas de lancamento sao identificadas pelo cabecalho de cada aba. Quando uma aba desloca o layout padrao, como aconteceu na aba `108`, o extrator usa a coluna detectada e registra o alerta na auditoria. Marcadores textuais como `D/C`, `D-Passivo, C-Resultado` e observacoes em `BB/BC` tambem ficam guardados para revisao.
 
-## Fluxo de lancamento
+## Fluxo de lancamento no sistema
 
 1. Use a aba `Transacoes` para simular eventos novos sobre um contrato.
 2. Para pagamentos, confira as parcelas do contrato, selecione a proxima parcela ou marque varias parcelas pendentes.
 3. Confira quantas parcelas ficam pendentes apos a selecao e o total selecionado.
-4. Para ajustes sem parcela especifica, escolha acao, data, valor, numero de parcelas, alvo, direcao e se quitou.
+4. Para ajustes sem parcela especifica, escolha acao, data, valor, alvo, direcao e se quitou.
 5. Confira a explicacao e a simulacao dos debitos/creditos.
 6. Clique em `Adicionar a esteira`.
-7. Use a aba `Lancamentos` para filtrar, selecionar e exportar o CSV.
+7. O Painel, a aba Contratos e o detalhe do contrato passam a refletir o saldo ajustado pela camada HTML.
+8. Use a aba `Lancamentos` para filtrar, selecionar e exportar o CSV contabil.
 
 ## Importacao em lote
 
@@ -85,4 +87,6 @@ O dashboard gera uma previa com as colunas esperadas pelo arquivo de importacao 
 Parcelamento;Data;Cod. Conta Debito;Cod. Conta Credito;Valor;Cod. Historico;Complemento Historico;Inicia Lote;Codigo Matriz/Filial;Centro de Custo Debito;Centro de Custo Credito
 ```
 
-As transacoes feitas no HTML ficam salvas no navegador como camada local. Elas entram na previa e na exportacao, mas nao alteram a planilha `.xlsb` nem o JSON gerado pelo extrator. Use `Exportar camada JSON` para salvar um backup dessas transacoes manuais.
+As transacoes feitas no HTML ficam salvas no navegador como camada local. Elas entram na previa, na exportacao contabil e recalculam os saldos apresentados no Painel/Contratos. Use `Exportar camada JSON` para salvar um backup dessas transacoes manuais e dos saldos atualizados por contrato.
+
+O JSON extraido continua sendo a carga inicial historica. A operacao diaria pode acontecer no HTML por lancamento manual ou importacao CSV; para uma substituicao completa da planilha, a proxima evolucao natural e persistir essa camada em arquivo/base de dados compartilhada e transformar as formulas de juros/amortizacao em um motor financeiro versionado no proprio projeto.

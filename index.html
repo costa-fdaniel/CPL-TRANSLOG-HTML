@@ -48,6 +48,8 @@
         <section id="kpis" class="kpi-grid"></section>
 
         <section id="panelTab" class="tab-panel active">
+          <section id="panelSummary" class="panel-summary"></section>
+
           <section class="dashboard-grid">
             <div class="panel">
               <div class="panel-header">
@@ -88,6 +90,12 @@
         </section>
 
         <section id="transactionsTab" class="tab-panel">
+          <section class="workflow-strip">
+            <div><strong>1</strong><span>Selecione contrato e acao</span></div>
+            <div><strong>2</strong><span>Escolha parcelas ou importe CSV</span></div>
+            <div><strong>3</strong><span>Revise a previa e adicione a esteira</span></div>
+          </section>
+
           <section class="grid-two transaction-layout">
             <div class="panel">
               <div class="panel-header">
@@ -117,11 +125,11 @@
                     <span>Data</span>
                     <input id="transactionDateInput" class="select" type="date">
                   </label>
-                  <label>
+                  <label data-field="amount">
                     <span>Valor total</span>
                     <input id="transactionAmountInput" class="select" type="number" step="0.01" min="0" placeholder="0,00">
                   </label>
-                  <label>
+                  <label data-field="installments">
                     <span>N parcelas</span>
                     <input id="transactionInstallmentsInput" class="select" type="number" min="1" value="1">
                   </label>
@@ -132,7 +140,7 @@
                       <option value="S">Sim</option>
                     </select>
                   </label>
-                  <label>
+                  <label data-field="scope">
                     <span>Alvo</span>
                     <select id="transactionScopeSelect" class="select">
                       <option value="current">Circulante</option>
@@ -140,18 +148,18 @@
                       <option value="both">Circulante + Nao circulante</option>
                     </select>
                   </label>
-                  <label>
+                  <label data-field="direction">
                     <span>Direcao</span>
                     <select id="transactionDirectionSelect" class="select">
                       <option value="increase">Aumenta saldo/juros</option>
                       <option value="decrease">Reduz saldo/juros</option>
                     </select>
                   </label>
-                  <label>
+                  <label data-field="manual">
                     <span>Debito manual</span>
                     <input id="transactionDebitInput" class="select" type="text" placeholder="Opcional">
                   </label>
-                  <label>
+                  <label data-field="manual">
                     <span>Credito manual</span>
                     <input id="transactionCreditInput" class="select" type="text" placeholder="Opcional">
                   </label>
@@ -294,6 +302,12 @@
         </section>
 
         <section id="ledgerTab" class="tab-panel">
+          <section class="workflow-strip">
+            <div><strong>1</strong><span>Filtre o que sera importado</span></div>
+            <div><strong>2</strong><span>Revise prontos e pendencias</span></div>
+            <div><strong>3</strong><span>Exporte o CSV contabil</span></div>
+          </section>
+
           <section class="panel">
             <div class="panel-header">
               <div class="panel-title">Esteira de lancamentos</div>

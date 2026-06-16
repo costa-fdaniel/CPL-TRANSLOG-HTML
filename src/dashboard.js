@@ -33,6 +33,7 @@ const els = {
   tabs: document.querySelectorAll(".tab-button"),
   tabPanels: document.querySelectorAll(".tab-panel"),
   kpis: document.querySelector("#kpis"),
+  panelSummary: document.querySelector("#panelSummary"),
   monthlyChart: document.querySelector("#monthlyChart"),
   debtSplitChart: document.querySelector("#debtSplitChart"),
   topContractsChart: document.querySelector("#topContractsChart"),
@@ -203,6 +204,72 @@ function allLedgerEntries() {
   return [...(state.data?.ledgerEntries || []), ...state.manualEntries];
 }
 
+function manualImpactFor(contract) {
+  const impact = {
+    currentPrincipal: 0,
+    nonCurrentPrincipal: 0,
+    currentInterest: 0,
+    nonCurrentInterest: 0,
+  };
+  state.manualEntries
+    .filter((entry) => entry.contractId === contract.id)
+    .forEach((entry) => {
+      const amount = Number(entry.amount || 0);
+      const debit = String(entry.debit || "");
+      const credit = String(entry.credit || "");
+      const rule = String(entry.rule || "");
+
+      if (entry.installmentComponent === "principal") {
+        impact.currentPrincipal -= amount;
+      } else if (entry.installmentComponent === "juros") {
+        impact.currentInterest -= amount;
+      } else if ((rule.includes("PGTO") || rule.includes("QUITACAO")) && credit === "000") {
+        if (debit === contract.accounts.naoCirc) impact.nonCurrentPrincipal -= amount;
+        if (debit === contract.accounts.circ) impact.currentPrincipal -= amount;
+      } else if (rule.includes("PASSIVO")) {
+        if (credit === contract.accounts.circ) impact.currentPrincipal += amount;
+        if (debit === contract.accounts.circ) impact.currentPrincipal -= amount;
+        if (credit === contract.accounts.naoCirc) impact.nonCurrentPrincipal += amount;
+        if (debit === contract.accounts.naoCirc) impact.nonCurrentPrincipal -= amount;
+      } else if (rule.includes("JUROS")) {
+        if (credit === contract.accounts.jurosCirc) impact.currentInterest += amount;
+        if (debit === contract.accounts.jurosCirc) impact.currentInterest -= amount;
+        if (credit === contract.accounts.jurosNaoCirc) impact.nonCurrentInterest += amount;
+        if (debit === contract.accounts.jurosNaoCirc) impact.nonCurrentInterest -= amount;
+      }
+    });
+  return impact;
+}
+
+function adjustedContract(contract) {
+  if (!contract) return null;
+  const impact = manualImpactFor(contract);
+  const currentFinal = Math.max(0, (contract.balances.currentFinal || 0) + impact.currentPrincipal);
+  const nonCurrentFinal = Math.max(0, (contract.balances.nonCurrentFinal || 0) + impact.nonCurrentPrincipal);
+  const interestCurrent = Math.max(0, (contract.balances.interestCurrent || 0) + impact.currentInterest);
+  const interestNonCurrent = Math.max(0, (contract.balances.interestNonCurrent || 0) + impact.nonCurrentInterest);
+  return {
+    ...contract,
+    status: contract.status === "quitado" || (currentFinal + nonCurrentFinal <= 0.005 && contractInstallments(contract).every((item) => item.status !== "pendente"))
+      ? "quitado"
+      : contract.status,
+    balances: {
+      ...contract.balances,
+      currentFinal,
+      nonCurrentFinal,
+      finalDebt: currentFinal + nonCurrentFinal,
+      interestCurrent,
+      interestNonCurrent,
+      interestTotal: interestCurrent + interestNonCurrent,
+    },
+    systemImpact: impact,
+  };
+}
+
+function adjustedContracts() {
+  return (state.data?.contracts || []).map((contract) => adjustedContract(contract));
+}
+
 function saveManualEntries() {
   localStorage.setItem(MANUAL_STORAGE_KEY, JSON.stringify(state.manualEntries));
 }
@@ -218,13 +285,13 @@ function loadManualEntries() {
 
 function selectedTransactionContract() {
   const id = Number(els.transactionContractSelect.value);
-  return state.data?.contracts.find((contract) => contract.id === id) || null;
+  return adjustedContracts().find((contract) => contract.id === id) || null;
 }
 
 function contractByInput(value) {
   const text = String(value ?? "").trim();
   if (!text) return null;
-  return state.data?.contracts.find((contract) => (
+  return adjustedContracts().find((contract) => (
     String(contract.id) === text || String(contract.contractNumber) === text
   )) || null;
 }
@@ -418,7 +485,7 @@ function applyFilters() {
   const status = els.statusFilter.value;
   const entity = els.entityFilter.value;
 
-  state.filteredContracts = state.data.contracts
+  state.filteredContracts = adjustedContracts()
     .filter((contract) => status === "all" || contract.status === status)
     .filter((contract) => entity === "all" || contract.entity === entity)
     .filter((contract) => {
@@ -481,6 +548,7 @@ function applyLedgerFilters() {
 
 function renderEmpty() {
   els.kpis.innerHTML = "";
+  els.panelSummary.innerHTML = "";
   els.monthlyChart.innerHTML = `<div class="empty-state">Aguardando dados processados.</div>`;
   els.debtSplitChart.innerHTML = "";
   els.topContractsChart.innerHTML = "";
@@ -531,14 +599,53 @@ function renderKpis() {
 }
 
 function renderPanelCharts() {
+  renderPanelSummary();
   renderMonthlyChart();
   renderDebtSplit();
   renderTopContractsChart();
   renderTypeChart();
 }
 
+function renderPanelSummary() {
+  const contracts = state.filteredContracts;
+  const entries = state.manualEntries;
+  const finalDebt = sum(contracts, (contract) => contract.balances.finalDebt);
+  const originalDebt = sum(
+    state.data.contracts.filter((contract) => contracts.some((item) => item.id === contract.id)),
+    (contract) => contract.balances.finalDebt,
+  );
+  const principalImpact = finalDebt - originalDebt;
+  const pendingInstallments = sum(contracts, (contract) => contractInstallmentStats(contract).pendingAfterSelection);
+  const reviewCount = entries.filter((entry) => entry.reviewStatus === "revisar").length;
+  els.panelSummary.innerHTML = `
+    <div class="summary-hero">
+      <span>Saldo atualizado no sistema</span>
+      <strong>${fmtMoney(finalDebt, true)}</strong>
+      <small>${principalImpact <= 0 ? "Reducao" : "Aumento"} pela camada HTML: ${fmtMoney(Math.abs(principalImpact), true)}</small>
+    </div>
+    <div class="summary-tile">
+      <span>Parcelas pendentes</span>
+      <strong>${pendingInstallments}</strong>
+    </div>
+    <div class="summary-tile">
+      <span>Lancamentos HTML</span>
+      <strong>${entries.length}</strong>
+    </div>
+    <div class="summary-tile">
+      <span>A revisar</span>
+      <strong>${reviewCount}</strong>
+    </div>
+  `;
+}
+
 function renderMonthlyChart() {
-  const series = state.data.monthlySeries || [];
+  const series = entriesFromGroup(groupSum(
+    allLedgerEntries(),
+    (entry) => entry.month,
+    (entry) => entry.amount,
+  ))
+    .sort((a, b) => a.label.localeCompare(b.label))
+    .map((item) => ({ label: item.label, amount: item.value }));
   const max = Math.max(...series.map((item) => item.amount), 1);
   els.monthlyChart.innerHTML = series.map((item) => {
     const height = Math.max(2, (item.amount / max) * 180);
@@ -637,7 +744,7 @@ function renderContractsTable() {
 }
 
 function selectedContract() {
-  return state.data.contracts.find((contract) => contract.id === state.selectedId);
+  return adjustedContracts().find((contract) => contract.id === state.selectedId);
 }
 
 function selectedDetail() {
@@ -665,6 +772,9 @@ function renderDetail() {
     ["Conta N-CIRC", contract.accounts.naoCirc, "C"],
     ["(-) Juros N-CIRC", contract.accounts.jurosNaoCirc, "D"],
   ];
+  const systemImpact = contract.systemImpact || {};
+  const principalImpact = (systemImpact.currentPrincipal || 0) + (systemImpact.nonCurrentPrincipal || 0);
+  const interestImpact = (systemImpact.currentInterest || 0) + (systemImpact.nonCurrentInterest || 0);
 
   els.detail.innerHTML = `
     <div class="contract-card">
@@ -729,6 +839,8 @@ function renderDetail() {
       <div class="contract-footer">
         <span>Movimentos: ${movementCount}</span>
         <span>Lancamentos: ${ledgerCount}</span>
+        <span>Impacto HTML principal: ${fmtMoney(principalImpact, true)}</span>
+        <span>Impacto HTML juros: ${fmtMoney(interestImpact, true)}</span>
         <span>${flags}</span>
       </div>
     </div>
@@ -929,6 +1041,21 @@ function actionExplanation(action) {
   }[action] || "";
 }
 
+function toggleTransactionFields() {
+  const action = els.transactionActionSelect.value;
+  const visible = {
+    amount: true,
+    installments: ["payment", "settlement"].includes(action),
+    scope: ["payment", "settlement", "interest_adjustment", "liability_adjustment"].includes(action),
+    direction: ["interest_adjustment", "liability_adjustment"].includes(action),
+    manual: action === "custom",
+  };
+  document.querySelectorAll("[data-field]").forEach((field) => {
+    const key = field.dataset.field;
+    field.classList.toggle("field-hidden", visible[key] === false);
+  });
+}
+
 function simulateSelectedInstallmentPayments(contract, action, selectedInstallments, options = {}) {
   const paymentDate = options.date ?? els.transactionDateInput.value;
   const settled = options.settled ?? els.transactionSettledSelect.value;
@@ -1084,6 +1211,7 @@ function renderTransactionPanel() {
   if (!state.data) return;
   const contract = selectedTransactionContract();
   const action = els.transactionActionSelect.value;
+  toggleTransactionFields();
   els.transactionExplanation.innerHTML = `<p>${escapeHtml(actionExplanation(action))}</p>`;
 
   if (contract) {
@@ -1490,15 +1618,26 @@ function addDraftTransactionToLedger() {
   state.selectedInstallmentKeys.clear();
   els.ledgerReadyFilter.value = "all";
   populateLedgerControls();
-  applyLedgerFilters();
-  render();
+  applyFilters();
 }
 
 function exportManualLayer() {
+  const contracts = adjustedContracts();
   const payload = {
     exportedAt: new Date().toISOString(),
     count: state.manualEntries.length,
     entries: state.manualEntries,
+    contractBalances: contracts.map((contract) => ({
+      id: contract.id,
+      contractNumber: contract.contractNumber,
+      status: contract.status,
+      finalDebt: contract.balances.finalDebt,
+      currentFinal: contract.balances.currentFinal,
+      nonCurrentFinal: contract.balances.nonCurrentFinal,
+      interestTotal: contract.balances.interestTotal,
+      interestCurrent: contract.balances.interestCurrent,
+      interestNonCurrent: contract.balances.interestNonCurrent,
+    })),
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -1516,8 +1655,7 @@ function clearManualLayer() {
   state.selectedLedgerIds.clear();
   saveManualEntries();
   populateLedgerControls();
-  applyLedgerFilters();
-  render();
+  applyFilters();
 }
 
 function selectableInstallments(contract) {
@@ -1602,8 +1740,7 @@ function addBatchEntriesToLedger() {
   saveManualEntries();
   els.ledgerReadyFilter.value = "all";
   populateLedgerControls();
-  applyLedgerFilters();
-  render();
+  applyFilters();
 }
 
 function clearBatchImport() {
