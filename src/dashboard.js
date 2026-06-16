@@ -36,11 +36,16 @@ const els = {
   kpis: document.querySelector("#kpis"),
   panelYearFilter: document.querySelector("#panelYearFilter"),
   panelContractFilter: document.querySelector("#panelContractFilter"),
+  panelMetricFilter: document.querySelector("#panelMetricFilter"),
   panelSummary: document.querySelector("#panelSummary"),
   monthlyChart: document.querySelector("#monthlyChart"),
   debtSplitChart: document.querySelector("#debtSplitChart"),
   topContractsChart: document.querySelector("#topContractsChart"),
   typeChart: document.querySelector("#typeChart"),
+  entityChart: document.querySelector("#entityChart"),
+  reviewChart: document.querySelector("#reviewChart"),
+  interestChart: document.querySelector("#interestChart"),
+  pendingChart: document.querySelector("#pendingChart"),
   contractsTable: document.querySelector("#contractsTable tbody"),
   detail: document.querySelector("#contractDetail"),
   audit: document.querySelector("#auditList"),
@@ -219,6 +224,7 @@ function panelFilterValues() {
   return {
     year: els.panelYearFilter?.value || "all",
     contractId: els.panelContractFilter?.value || "all",
+    metric: els.panelMetricFilter?.value || "debt",
   };
 }
 
@@ -618,6 +624,10 @@ function renderEmpty() {
   els.debtSplitChart.innerHTML = "";
   els.topContractsChart.innerHTML = "";
   els.typeChart.innerHTML = "";
+  els.entityChart.innerHTML = "";
+  els.reviewChart.innerHTML = "";
+  els.interestChart.innerHTML = "";
+  els.pendingChart.innerHTML = "";
   els.contractsTable.innerHTML = "";
   els.detail.innerHTML = `<div class="empty-state">Selecione ou carregue uma base.</div>`;
   els.audit.innerHTML = "";
@@ -669,6 +679,10 @@ function renderPanelCharts() {
   renderDebtSplit();
   renderTopContractsChart();
   renderTypeChart();
+  renderEntityChart();
+  renderReviewChart();
+  renderInterestChart();
+  renderPendingChart();
 }
 
 function renderPanelSummary() {
@@ -739,28 +753,77 @@ function renderDebtSplit() {
   const total = Math.max(current + nonCurrent, 1);
   const currentPct = (current / total) * 100;
   const nonCurrentPct = (nonCurrent / total) * 100;
+  const interest = sum(contracts, (contract) => Math.max(0, contract.balances.interestTotal));
 
   els.debtSplitChart.innerHTML = `
-    <div class="split-track">
-      <div class="split-segment current" style="width:${currentPct}%"></div>
-      <div class="split-segment non-current" style="width:${nonCurrentPct}%"></div>
-    </div>
-    <div class="split-legend">
-      <div><span class="dot current"></span> Circulante <strong>${fmtMoney(current, true)}</strong></div>
-      <div><span class="dot non-current"></span> Nao circulante <strong>${fmtMoney(nonCurrent, true)}</strong></div>
+    <div class="donut-layout">
+      <div class="donut" style="background: conic-gradient(var(--blue) 0 ${currentPct}%, var(--green) ${currentPct}% 100%)">
+        <div>
+          <span>Total</span>
+          <strong>${fmtMoney(total)}</strong>
+        </div>
+      </div>
+      <div class="split-legend">
+        <div><span class="dot current"></span> Circulante <strong>${fmtMoney(current, true)}</strong> <em>${currentPct.toFixed(1).replace(".", ",")}%</em></div>
+        <div><span class="dot non-current"></span> Nao circulante <strong>${fmtMoney(nonCurrent, true)}</strong> <em>${nonCurrentPct.toFixed(1).replace(".", ",")}%</em></div>
+        <div><span class="dot amber"></span> Juros total <strong>${fmtMoney(interest, true)}</strong></div>
+      </div>
     </div>
   `;
 }
 
 function renderTopContractsChart() {
+  const metric = panelFilterValues().metric;
+  const valueGetter = {
+    debt: (contract) => contract.balances.finalDebt,
+    interest: (contract) => contract.balances.interestTotal,
+    pending: (contract) => contractInstallmentStats(contract).pendingAfterSelection,
+    flow: (contract) => sum(panelLedgerEntries().filter((entry) => entry.contractId === contract.id), (entry) => entry.amount),
+  }[metric] || ((contract) => contract.balances.finalDebt);
+  const valueFormatter = metric === "pending" ? (value) => `${value} parc.` : (value) => fmtMoney(value);
+  const items = panelContracts()
+    .map((contract) => ({
+      id: contract.id,
+      label: `${contract.id} - ${contract.contractNumber}`,
+      value: valueGetter(contract),
+      meta: `${contract.entity} / ${contract.status}`,
+    }))
+    .filter((item) => item.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
+  renderRankChart(els.topContractsChart, items, { clickable: true, valueFormatter });
+}
+
+function renderInterestChart() {
   const items = panelContracts()
     .filter((contract) => contract.balances.finalDebt > 0)
-    .slice(0, 10)
     .map((contract) => ({
+      id: contract.id,
       label: `${contract.id} - ${contract.contractNumber}`,
-      value: contract.balances.finalDebt,
-    }));
-  renderRankChart(els.topContractsChart, items);
+      value: contract.balances.interestTotal,
+      meta: contract.entity,
+    }))
+    .filter((item) => item.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
+  renderRankChart(els.interestChart, items, { clickable: true });
+}
+
+function renderPendingChart() {
+  const items = panelContracts()
+    .map((contract) => ({
+      id: contract.id,
+      label: `${contract.id} - ${contract.contractNumber}`,
+      value: contractInstallmentStats(contract).pendingAfterSelection,
+      meta: contract.entity,
+    }))
+    .filter((item) => item.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
+  renderRankChart(els.pendingChart, items, {
+    clickable: true,
+    valueFormatter: (value) => `${value} parc.`,
+  });
 }
 
 function renderTypeChart() {
@@ -772,21 +835,72 @@ function renderTypeChart() {
   renderRankChart(els.typeChart, items);
 }
 
-function renderRankChart(container, items) {
+function renderEntityChart() {
+  const items = entriesFromGroup(groupSum(
+    panelContracts(),
+    (contract) => contract.entity || "Sem empresa",
+    (contract) => contract.balances.finalDebt,
+  ));
+  renderRankChart(els.entityChart, items);
+}
+
+function renderReviewChart() {
+  const entries = panelLedgerEntries();
+  const ready = entries.filter((entry) => entry.reviewStatus === "pronto").length;
+  const review = entries.filter((entry) => entry.reviewStatus !== "pronto").length;
+  const total = Math.max(ready + review, 1);
+  const readyPct = (ready / total) * 100;
+  const reviewPct = (review / total) * 100;
+  els.reviewChart.innerHTML = `
+    <div class="review-track">
+      <div class="review-ready" style="width:${readyPct}%"></div>
+      <div class="review-warning" style="width:${reviewPct}%"></div>
+    </div>
+    <div class="review-grid">
+      <div><span>Prontos</span><strong>${ready}</strong><small>${readyPct.toFixed(1).replace(".", ",")}%</small></div>
+      <div><span>A revisar</span><strong>${review}</strong><small>${reviewPct.toFixed(1).replace(".", ",")}%</small></div>
+    </div>
+  `;
+}
+
+function renderRankChart(container, items, options = {}) {
   if (!items.length) {
     container.innerHTML = `<div class="empty-state">Sem dados no filtro atual.</div>`;
     return;
   }
+  const valueFormatter = options.valueFormatter || ((value) => fmtMoney(value));
   const max = Math.max(...items.map((item) => item.value), 1);
   container.innerHTML = items.map((item) => `
-    <div class="rank-row">
-      <div class="rank-label">${escapeHtml(item.label)}</div>
+    <button class="rank-row ${options.clickable ? "rank-clickable" : ""}" type="button" ${options.clickable && item.id ? `data-contract-id="${item.id}"` : ""}>
+      <div class="rank-label">
+        <strong>${escapeHtml(item.label)}</strong>
+        ${item.meta ? `<span>${escapeHtml(item.meta)}</span>` : ""}
+      </div>
       <div class="rank-track">
         <div class="rank-bar" style="width:${Math.max(2, (item.value / max) * 100)}%"></div>
       </div>
-      <div class="rank-value">${fmtMoney(item.value)}</div>
-    </div>
+      <div class="rank-value">${escapeHtml(valueFormatter(item.value))}</div>
+    </button>
   `).join("");
+  if (options.clickable) {
+    container.querySelectorAll("[data-contract-id]").forEach((row) => {
+      row.addEventListener("click", () => selectPanelContract(Number(row.dataset.contractId)));
+    });
+  }
+}
+
+function selectPanelContract(contractId) {
+  if (!contractId) return;
+  state.selectedId = contractId;
+  state.selectedInstallmentKeys.clear();
+  els.panelContractFilter.value = String(contractId);
+  syncTransactionContractToSelected();
+  state.transactionDraftEntries = simulateTransaction();
+  renderPanelCharts();
+  renderContractsTable();
+  renderDetail();
+  renderAudit();
+  renderTransactionPanel();
 }
 
 function renderContractsTable() {
@@ -1849,6 +1963,7 @@ els.entityFilter.addEventListener("change", applyFilters);
 [
   els.panelYearFilter,
   els.panelContractFilter,
+  els.panelMetricFilter,
 ].forEach((control) => {
   control.addEventListener("change", renderPanelCharts);
 });

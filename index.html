@@ -61,12 +61,21 @@
                 <option value="all">Todos os contratos</option>
               </select>
             </label>
+            <label>
+              <span>Visao principal</span>
+              <select id="panelMetricFilter" class="select">
+                <option value="debt">Saldo / divida</option>
+                <option value="interest">Juros</option>
+                <option value="pending">Parcelas pendentes</option>
+                <option value="flow">Fluxo de lancamentos</option>
+              </select>
+            </label>
           </section>
 
           <section id="panelSummary" class="panel-summary"></section>
 
           <section class="dashboard-grid">
-            <div class="panel">
+            <div class="panel panel-wide">
               <div class="panel-header">
                 <div class="panel-title">Fluxo mensal previsto</div>
               </div>
@@ -99,6 +108,42 @@
               </div>
               <div class="panel-body">
                 <div id="typeChart" class="rank-chart"></div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Saldo por empresa</div>
+              </div>
+              <div class="panel-body">
+                <div id="entityChart" class="rank-chart"></div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Lancamentos prontos x revisar</div>
+              </div>
+              <div class="panel-body">
+                <div id="reviewChart" class="review-chart"></div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Maiores contratos por juros</div>
+              </div>
+              <div class="panel-body">
+                <div id="interestChart" class="rank-chart"></div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Parcelas pendentes por contrato</div>
+              </div>
+              <div class="panel-body">
+                <div id="pendingChart" class="rank-chart"></div>
               </div>
             </div>
           </section>
