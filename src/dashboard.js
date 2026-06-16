@@ -4,6 +4,7 @@ const state = {
   filteredLedger: [],
   selectedId: null,
   selectedLedgerIds: new Set(),
+  selectedInstallmentKeys: new Set(),
   manualEntries: [],
   transactionDraftEntries: [],
 };
@@ -70,6 +71,11 @@ const els = {
   addTransactionButton: document.querySelector("#addTransactionButton"),
   transactionExplanation: document.querySelector("#transactionExplanation"),
   transactionContractSnapshot: document.querySelector("#transactionContractSnapshot"),
+  paymentInstallmentSummary: document.querySelector("#paymentInstallmentSummary"),
+  paymentInstallmentsTable: document.querySelector("#paymentInstallmentsTable tbody"),
+  selectNextInstallmentButton: document.querySelector("#selectNextInstallmentButton"),
+  selectAllPendingInstallmentsButton: document.querySelector("#selectAllPendingInstallmentsButton"),
+  clearInstallmentSelectionButton: document.querySelector("#clearInstallmentSelectionButton"),
   transactionSimulationTable: document.querySelector("#transactionSimulationTable tbody"),
   transactionSimulationCount: document.querySelector("#transactionSimulationCount"),
   manualTransactionsTable: document.querySelector("#manualTransactionsTable tbody"),
@@ -132,6 +138,14 @@ function addMonths(dateString, months) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function todayIso() {
+  const date = new Date();
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 function accountIsReady(account) {
   const text = String(account ?? "").trim();
   if (!text || ["AAA", "Quitado"].includes(text)) return false;
@@ -186,6 +200,118 @@ function selectedTransactionContract() {
   return state.data?.contracts.find((contract) => contract.id === id) || null;
 }
 
+function syncTransactionContractToSelected() {
+  if (!els.transactionContractSelect || !state.selectedId) return;
+  const hasOption = [...els.transactionContractSelect.options].some((option) => option.value === String(state.selectedId));
+  if (hasOption) {
+    els.transactionContractSelect.value = String(state.selectedId);
+  }
+}
+
+function contractDetailById(contractId) {
+  return state.data?.contractDetails.find((detail) => detail.sheetId === contractId && !detail.replacedSheet)
+    || state.data?.contractDetails.find((detail) => detail.sheetId === contractId)
+    || null;
+}
+
+function numericValue(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function formatRate(contract, detail) {
+  const candidates = [
+    detail?.general?.method,
+    detail?.general?.rateOrInstallments,
+    contract?.type,
+  ];
+  const rate = candidates
+    .map((value) => numericValue(value))
+    .find((value) => value !== null && value > 0 && value < 1);
+  return rate ? `${(rate * 100).toFixed(2).replace(".", ",")}% a.m.` : "-";
+}
+
+function installmentAmountFromMovement(movement) {
+  const values = movement?.values || {};
+  const principal = Math.abs(Math.min(0, values.amortizacao_principal || 0));
+  const interest = Math.abs(Math.min(0, values.amortizacao_juros || 0));
+  return {
+    principal,
+    interest,
+    total: principal + interest,
+  };
+}
+
+function queuedInstallmentKeys() {
+  return new Set(state.manualEntries
+    .filter((entry) => entry.installmentKey)
+    .map((entry) => entry.installmentKey));
+}
+
+function contractInstallments(contract) {
+  const detail = contractDetailById(contract?.id);
+  if (!contract || !detail) return [];
+  const today = todayIso();
+  const queued = queuedInstallmentKeys();
+  return (detail.movements || [])
+    .map((movement) => {
+      const amounts = installmentAmountFromMovement(movement);
+      if (amounts.total <= 0.005) return null;
+      const key = `${contract.id}:${movement.parcel}:${movement.date}`;
+      let status = "pendente";
+      if (contract.status === "quitado" || movement.date < today) {
+        status = "paga";
+      } else if (queued.has(key)) {
+        status = "na esteira";
+      } else if (state.selectedInstallmentKeys.has(key)) {
+        status = "selecionada";
+      }
+      return {
+        key,
+        contractId: contract.id,
+        parcel: movement.parcel,
+        date: movement.date,
+        principal: amounts.principal,
+        interest: amounts.interest,
+        total: amounts.total,
+        status,
+        textMarkers: movement.textMarkers || {},
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.date.localeCompare(b.date) || Number(a.parcel) - Number(b.parcel));
+}
+
+function contractInstallmentStats(contract) {
+  const detail = contractDetailById(contract?.id);
+  const installments = contractInstallments(contract);
+  const statedInstallments = numericValue(detail?.general?.rateOrInstallments);
+  const maxParcel = Math.max(0, ...installments.map((item) => Number(item.parcel) || 0));
+  const total = statedInstallments && statedInstallments > 1
+    ? Math.max(statedInstallments, maxParcel)
+    : maxParcel || installments.length;
+  const paid = installments.filter((item) => item.status === "paga").length;
+  const queued = installments.filter((item) => item.status === "na esteira").length;
+  const selected = installments.filter((item) => item.status === "selecionada").length;
+  const pending = installments.filter((item) => item.status === "pendente" || item.status === "selecionada").length;
+  const pendingAfterSelection = Math.max(0, pending - selected);
+  return {
+    installments,
+    total,
+    paid,
+    queued,
+    selected,
+    pending,
+    pendingAfterSelection,
+    selectedAmount: sum(installments.filter((item) => item.status === "selecionada"), (item) => item.total),
+    pendingAmount: sum(installments.filter((item) => item.status === "pendente" || item.status === "selecionada"), (item) => item.total),
+  };
+}
+
+function selectedPaymentInstallments(contract) {
+  return contractInstallments(contract).filter((item) => item.status === "selecionada");
+}
+
 async function loadDefaultData() {
   try {
     const response = await fetch("data/processed/dashboard.json", { cache: "no-store" });
@@ -203,6 +329,7 @@ function setData(data, sourceLabel) {
   state.data = data;
   state.selectedId = data.contracts?.[0]?.id ?? null;
   state.selectedLedgerIds.clear();
+  state.selectedInstallmentKeys.clear();
   state.transactionDraftEntries = [];
   loadManualEntries();
   els.status.textContent = `${sourceLabel} | ${data.totals.contracts} contratos | gerado em ${data.metadata.generatedAt}`;
@@ -279,6 +406,9 @@ function applyFilters() {
 
   if (!state.filteredContracts.some((contract) => contract.id === state.selectedId)) {
     state.selectedId = state.filteredContracts[0]?.id ?? null;
+    state.selectedInstallmentKeys.clear();
+    syncTransactionContractToSelected();
+    state.transactionDraftEntries = simulateTransaction();
   }
 
   applyLedgerFilters();
@@ -334,6 +464,8 @@ function renderEmpty() {
   els.ledgerKpis.innerHTML = "";
   els.transactionSimulationTable.innerHTML = "";
   els.manualTransactionsTable.innerHTML = "";
+  els.paymentInstallmentSummary.innerHTML = "";
+  els.paymentInstallmentsTable.innerHTML = "";
   els.transactionExplanation.innerHTML = "";
   els.transactionContractSnapshot.innerHTML = "";
 }
@@ -462,9 +594,13 @@ function renderContractsTable() {
   els.contractsTable.querySelectorAll("tr").forEach((row) => {
     row.addEventListener("click", () => {
       state.selectedId = Number(row.dataset.id);
+      state.selectedInstallmentKeys.clear();
+      syncTransactionContractToSelected();
+      state.transactionDraftEntries = simulateTransaction();
       renderContractsTable();
       renderDetail();
       renderAudit();
+      renderTransactionPanel();
     });
   });
 }
@@ -474,8 +610,7 @@ function selectedContract() {
 }
 
 function selectedDetail() {
-  return state.data.contractDetails.find((detail) => detail.sheetId === state.selectedId && !detail.replacedSheet)
-    || state.data.contractDetails.find((detail) => detail.sheetId === state.selectedId);
+  return contractDetailById(state.selectedId);
 }
 
 function renderDetail() {
@@ -485,22 +620,86 @@ function renderDetail() {
     return;
   }
   const detail = selectedDetail();
+  const stats = contractInstallmentStats(contract);
   const movementCount = detail?.movements?.length || 0;
   const ledgerCount = allLedgerEntries().filter((entry) => entry.contractId === contract.id).length;
   const flags = contract.flags.length
     ? contract.flags.map((flag) => `<span class="pill pill-warning">${escapeHtml(flag)}</span>`).join(" ")
     : "-";
+  const description = detail?.general?.financiado || contract.comments || contract.type || "-";
+  const progress = stats.total ? Math.min(100, (stats.paid / stats.total) * 100) : 0;
+  const accounts = [
+    ["Conta CIRC", contract.accounts.circ, "C"],
+    ["(-) Juros CIRC", contract.accounts.jurosCirc, "D"],
+    ["Conta N-CIRC", contract.accounts.naoCirc, "C"],
+    ["(-) Juros N-CIRC", contract.accounts.jurosNaoCirc, "D"],
+  ];
 
   els.detail.innerHTML = `
-    <div class="detail-list">
-      <div class="detail-row"><span class="detail-label">Contrato</span><span class="detail-value">${escapeHtml(contract.contractNumber)}</span></div>
-      <div class="detail-row"><span class="detail-label">Empresa / tipo</span><span class="detail-value">${escapeHtml(contract.entity)} / ${escapeHtml(contract.type || "-")}</span></div>
-      <div class="detail-row"><span class="detail-label">Contas</span><span class="detail-value">C ${escapeHtml(contract.accounts.circ || "-")} | NC ${escapeHtml(contract.accounts.naoCirc || "-")} | Red. C ${escapeHtml(contract.accounts.jurosCirc || "-")} | Red. NC ${escapeHtml(contract.accounts.jurosNaoCirc || "-")}</span></div>
-      <div class="detail-row"><span class="detail-label">Divida final</span><span class="detail-value">${fmtMoney(contract.balances.finalDebt, true)}</span></div>
-      <div class="detail-row"><span class="detail-label">Juros totais</span><span class="detail-value">${fmtMoney(contract.balances.interestTotal, true)}</span></div>
-      <div class="detail-row"><span class="detail-label">Movimentos / lancamentos</span><span class="detail-value">${movementCount} / ${ledgerCount}</span></div>
-      <div class="detail-row"><span class="detail-label">Marcadores</span><span class="detail-value">${flags}</span></div>
-      <div class="detail-row"><span class="detail-label">Comentarios</span><span class="detail-value">${escapeHtml(contract.comments || "-")}</span></div>
+    <div class="contract-card">
+      <div class="contract-card-head">
+        <div class="contract-card-title">Contratos</div>
+        <span class="index-pill">Index principal</span>
+      </div>
+
+      <div class="contract-id-box">
+        <span>No. contrato (ID)</span>
+        <strong>#${escapeHtml(contract.contractNumber)} <small>(${contract.id})</small></strong>
+      </div>
+
+      <div class="contract-metrics">
+        <div>
+          <span>Descricao</span>
+          <strong>${escapeHtml(description)}</strong>
+          <small>${escapeHtml(contract.entity)} / ${escapeHtml(contract.type || "-")}</small>
+        </div>
+        <div>
+          <span>% Juros</span>
+          <strong>${escapeHtml(formatRate(contract, detail))}</strong>
+          <small>${escapeHtml(detail?.general?.method || "")}</small>
+        </div>
+        <div>
+          <span>Principal (divida) / juros</span>
+          <strong>${fmtMoney(contract.balances.finalDebt, true)}</strong>
+          <small>${fmtMoney(contract.balances.interestTotal, true)}</small>
+        </div>
+        <div>
+          <span>No. de parcelas</span>
+          <strong>${stats.total || "-"}</strong>
+          <small>${stats.pending} pendente(s)</small>
+        </div>
+      </div>
+
+      <div class="installment-progress-block">
+        <div class="progress-row">
+          <span>Parcelas pagas (qtd)</span>
+          <strong>${stats.paid} de ${stats.total || stats.installments.length} pagas</strong>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" style="width:${progress}%"></div>
+        </div>
+        <div class="progress-foot">
+          <span>${stats.pendingAfterSelection} pendente(s) apos selecao</span>
+          <span>${stats.queued} na esteira</span>
+        </div>
+      </div>
+
+      <div class="accounts-box">
+        <div class="accounts-title">Contas contabeis dos saldos</div>
+        ${accounts.map(([label, account, nature]) => `
+          <div class="account-line">
+            <span>${escapeHtml(label)}</span>
+            <strong>${escapeHtml(account || "-")}</strong>
+            <em>${nature}</em>
+          </div>
+        `).join("")}
+      </div>
+
+      <div class="contract-footer">
+        <span>Movimentos: ${movementCount}</span>
+        <span>Lancamentos: ${ledgerCount}</span>
+        <span>${flags}</span>
+      </div>
     </div>
   `;
 }
@@ -632,7 +831,19 @@ function scopeTargets(contract, scope, action) {
   return base.filter((target) => target.scope === scope);
 }
 
-function makeManualEntry({ contract, date, debit, credit, amount, rule, description, issues = [] }) {
+function makeManualEntry({
+  contract,
+  date,
+  debit,
+  credit,
+  amount,
+  rule,
+  description,
+  issues = [],
+  parcel = "",
+  sourceColumn = "HTML",
+  extra = {},
+}) {
   const issueList = [...issues];
   if (!accountIsReady(debit)) issueList.push(`Debito pendente: ${debit || "vazio"}`);
   if (!accountIsReady(credit)) issueList.push(`Credito pendente: ${credit || "vazio"}`);
@@ -646,7 +857,7 @@ function makeManualEntry({ contract, date, debit, credit, amount, rule, descript
     entity: contract.entity,
     contractType: contract.type,
     status: contract.status,
-    parcel: "",
+    parcel,
     date,
     year: Number(date.slice(0, 4)),
     month: date.slice(0, 7),
@@ -656,10 +867,11 @@ function makeManualEntry({ contract, date, debit, credit, amount, rule, descript
     historyCode: "",
     description,
     rule,
-    sourceColumn: "HTML",
+    sourceColumn,
     sourceRow: "",
     reviewStatus: issueList.length ? "revisar" : "pronto",
     issues: issueList,
+    ...extra,
   };
 }
 
@@ -678,12 +890,65 @@ function transactionDescription(action, contract, target, note, settled) {
 
 function actionExplanation(action) {
   return {
-    payment: "Registra pagamento ou amortizacao contra a conta do passivo selecionada e a conta 000. Use N parcelas para dividir o valor em vencimentos mensais.",
+    payment: "Registra pagamento ou amortizacao contra a conta do passivo e a conta 000. Se houver parcelas selecionadas, usa exatamente essas parcelas; sem selecao, usa o valor livre do formulario.",
     interest_adjustment: "Gera ajuste de juros contra a conta de resultado do contrato. Leasing usa 4773; os demais usam 375. A direcao define se aumenta ou reduz o juros/redutora.",
     liability_adjustment: "Gera ajuste no passivo circulante ou nao circulante. Usa a conta ponte AAA e por isso fica marcado como revisar antes da importacao.",
-    settlement: "Registra baixa/quitacao do contrato no alvo escolhido. Se o valor ficar vazio, usa o saldo final do alvo quando existir.",
+    settlement: "Registra baixa/quitacao do contrato no alvo escolhido. Se houver parcelas selecionadas, baixa essas parcelas; se o valor ficar vazio, usa o saldo final do alvo quando existir.",
     custom: "Permite informar manualmente debito e credito. Use quando a operacao nao couber nas regras padrao.",
   }[action] || "";
+}
+
+function simulateSelectedInstallmentPayments(contract, action, selectedInstallments) {
+  const paymentDate = els.transactionDateInput.value;
+  const settled = els.transactionSettledSelect.value;
+  const note = els.transactionNoteInput.value.trim();
+  const entries = [];
+  selectedInstallments.forEach((installment) => {
+    const date = paymentDate || installment.date;
+    const baseDescription = `${action === "settlement" ? "Quitacao" : "Pagamento"} parcela ${installment.parcel} venc. ${fmtDateBr(installment.date)} ref. contrato ${contract.contractNumber} aba (${contract.id})`;
+    const noteText = note ? ` - ${note}` : "";
+    const issues = [];
+    if (settled === "S") issues.push("Quitou = S; conferir se a baixa liquida o saldo do contrato");
+
+    if (installment.principal > 0.005) {
+      entries.push(makeManualEntry({
+        contract,
+        date,
+        debit: contract.accounts.circ,
+        credit: "000",
+        amount: installment.principal,
+        rule: action === "settlement" ? "TX-QUIT-PARC-PRINC" : "TX-PARC-PRINC",
+        description: `${baseDescription} - principal${noteText}`,
+        issues,
+        parcel: installment.parcel,
+        extra: {
+          installmentKey: installment.key,
+          installmentDueDate: installment.date,
+          installmentComponent: "principal",
+        },
+      }));
+    }
+
+    if (installment.interest > 0.005) {
+      entries.push(makeManualEntry({
+        contract,
+        date,
+        debit: contract.accounts.circ,
+        credit: "000",
+        amount: installment.interest,
+        rule: action === "settlement" ? "TX-QUIT-PARC-JUROS" : "TX-PARC-JUROS",
+        description: `${baseDescription} - juros${noteText}`,
+        issues,
+        parcel: installment.parcel,
+        extra: {
+          installmentKey: installment.key,
+          installmentDueDate: installment.date,
+          installmentComponent: "juros",
+        },
+      }));
+    }
+  });
+  return entries;
 }
 
 function simulateTransaction() {
@@ -702,6 +967,11 @@ function simulateTransaction() {
   const targets = action === "custom"
     ? [{ scope: "custom", label: "Manual", weight: 1, principalAccount: "", interestAccount: "" }]
     : scopeTargets(contract, scope, action);
+  const selectedInstallments = selectedPaymentInstallments(contract);
+
+  if ((action === "payment" || action === "settlement") && selectedInstallments.length) {
+    return simulateSelectedInstallmentPayments(contract, action, selectedInstallments);
+  }
 
   if (!date || (!amountInput && action !== "settlement")) {
     return [];
@@ -783,11 +1053,14 @@ function renderTransactionPanel() {
   els.transactionExplanation.innerHTML = `<p>${escapeHtml(actionExplanation(action))}</p>`;
 
   if (contract) {
+    const stats = contractInstallmentStats(contract);
     els.transactionContractSnapshot.innerHTML = `
       <div><span>Contrato</span><strong>${escapeHtml(contract.contractNumber)}</strong></div>
       <div><span>Status</span><strong>${escapeHtml(contract.status)}</strong></div>
       <div><span>Tipo</span><strong>${escapeHtml(contract.type || "-")}</strong></div>
       <div><span>Resultado</span><strong>${resultAccountFor(contract)}</strong></div>
+      <div><span>Parcelas</span><strong>${stats.paid}/${stats.total || stats.installments.length} pagas</strong></div>
+      <div><span>Pendentes</span><strong>${stats.pendingAfterSelection} apos selecao</strong></div>
       <div><span>Circ.</span><strong>${escapeHtml(contract.accounts.circ || "-")}</strong></div>
       <div><span>N-Circ.</span><strong>${escapeHtml(contract.accounts.naoCirc || "-")}</strong></div>
       <div><span>Red. C</span><strong>${escapeHtml(contract.accounts.jurosCirc || "-")}</strong></div>
@@ -795,15 +1068,64 @@ function renderTransactionPanel() {
     `;
   }
 
+  renderPaymentInstallments();
   renderTransactionSimulation();
   renderManualTransactions();
+}
+
+function renderPaymentInstallments() {
+  const contract = selectedTransactionContract();
+  if (!contract) {
+    els.paymentInstallmentSummary.innerHTML = "";
+    els.paymentInstallmentsTable.innerHTML = "";
+    return;
+  }
+  const stats = contractInstallmentStats(contract);
+  const rows = stats.installments;
+  els.paymentInstallmentSummary.innerHTML = `
+    <div class="summary-metric"><span>Total parcelas</span><strong>${stats.total || rows.length}</strong></div>
+    <div class="summary-metric"><span>Pagas</span><strong>${stats.paid}</strong></div>
+    <div class="summary-metric"><span>Pendentes</span><strong>${stats.pending}</strong></div>
+    <div class="summary-metric"><span>Selecionadas</span><strong>${stats.selected}</strong></div>
+    <div class="summary-metric"><span>Ficarao pendentes</span><strong>${stats.pendingAfterSelection}</strong></div>
+    <div class="summary-metric"><span>Total selecionado</span><strong>${fmtMoney(stats.selectedAmount, true)}</strong></div>
+  `;
+
+  els.paymentInstallmentsTable.innerHTML = rows.map((item) => {
+    const selectable = item.status === "pendente" || item.status === "selecionada";
+    const checked = state.selectedInstallmentKeys.has(item.key);
+    return `
+      <tr class="installment-row ${item.status.replace(/\s+/g, "-")}">
+        <td><input class="installment-check" type="checkbox" data-key="${escapeHtml(item.key)}" ${checked ? "checked" : ""} ${selectable ? "" : "disabled"}></td>
+        <td>${escapeHtml(item.parcel)}</td>
+        <td>${fmtDateBr(item.date)}</td>
+        <td>${fmtMoney(item.principal, true)}</td>
+        <td>${fmtMoney(item.interest, true)}</td>
+        <td>${fmtMoney(item.total, true)}</td>
+        <td><span class="pill ${item.status === "paga" ? "pill-settled" : item.status === "na esteira" ? "pill-warning" : "pill-active"}">${escapeHtml(item.status)}</span></td>
+      </tr>
+    `;
+  }).join("") || `<tr><td colspan="7" class="empty-cell">Sem parcelas com amortizacao para este contrato.</td></tr>`;
+
+  els.paymentInstallmentsTable.querySelectorAll(".installment-check").forEach((checkbox) => {
+    checkbox.addEventListener("change", () => {
+      if (checkbox.checked) {
+        state.selectedInstallmentKeys.add(checkbox.dataset.key);
+      } else {
+        state.selectedInstallmentKeys.delete(checkbox.dataset.key);
+      }
+      state.transactionDraftEntries = simulateTransaction();
+      renderTransactionPanel();
+      renderDetail();
+    });
+  });
 }
 
 function renderTransactionSimulation() {
   const rows = state.transactionDraftEntries;
   els.transactionSimulationCount.textContent = `${rows.length} lancamento(s) simulados`;
   els.transactionSimulationTable.innerHTML = rows.map((entry) => ledgerRowCells(entry, false)).join("")
-    || `<tr><td colspan="8" class="empty-cell">Preencha os dados e clique em Simular.</td></tr>`;
+    || `<tr><td colspan="9" class="empty-cell">Preencha os dados e clique em Simular.</td></tr>`;
 }
 
 function renderManualTransactions() {
@@ -811,7 +1133,7 @@ function renderManualTransactions() {
     .slice()
     .sort((a, b) => b.date.localeCompare(a.date))
     .map((entry) => ledgerRowCells(entry, false))
-    .join("") || `<tr><td colspan="8" class="empty-cell">Nenhuma transacao adicionada nesta camada local.</td></tr>`;
+    .join("") || `<tr><td colspan="9" class="empty-cell">Nenhuma transacao adicionada nesta camada local.</td></tr>`;
 }
 
 function ledgerRowCells(entry, withCheck = true) {
@@ -822,6 +1144,7 @@ function ledgerRowCells(entry, withCheck = true) {
     <tr class="${entry.origin === "manual" ? "manual-row" : ""}">
       ${checkbox}
       <td>${fmtDateBr(entry.date)}</td>
+      <td>${escapeHtml(entry.parcel || "-")}</td>
       <td>${entry.contractId} - ${escapeHtml(entry.contractNumber)}</td>
       <td>${escapeHtml(entry.rule)} <span class="source-column">${escapeHtml(entry.sourceColumn)}</span></td>
       <td>${escapeHtml(entry.debit)}</td>
@@ -897,6 +1220,7 @@ function addDraftTransactionToLedger() {
   state.manualEntries.push(...entries);
   saveManualEntries();
   state.transactionDraftEntries = [];
+  state.selectedInstallmentKeys.clear();
   els.ledgerReadyFilter.value = "all";
   populateLedgerControls();
   applyLedgerFilters();
@@ -927,6 +1251,36 @@ function clearManualLayer() {
   populateLedgerControls();
   applyLedgerFilters();
   render();
+}
+
+function selectableInstallments(contract) {
+  return contractInstallments(contract).filter((item) => item.status === "pendente" || item.status === "selecionada");
+}
+
+function selectNextInstallment() {
+  const contract = selectedTransactionContract();
+  const next = selectableInstallments(contract).find((item) => item.status === "pendente");
+  if (next) {
+    state.selectedInstallmentKeys.add(next.key);
+  }
+  state.transactionDraftEntries = simulateTransaction();
+  renderTransactionPanel();
+  renderDetail();
+}
+
+function selectAllPendingInstallments() {
+  const contract = selectedTransactionContract();
+  selectableInstallments(contract).forEach((item) => state.selectedInstallmentKeys.add(item.key));
+  state.transactionDraftEntries = simulateTransaction();
+  renderTransactionPanel();
+  renderDetail();
+}
+
+function clearInstallmentSelection() {
+  state.selectedInstallmentKeys.clear();
+  state.transactionDraftEntries = simulateTransaction();
+  renderTransactionPanel();
+  renderDetail();
 }
 
 function switchTab(tabName) {
@@ -1002,6 +1356,7 @@ els.exportLedgerButton.addEventListener("click", exportLedgerCsv);
   control.addEventListener("change", () => {
     if (control === els.transactionContractSelect) {
       state.selectedId = Number(control.value);
+      state.selectedInstallmentKeys.clear();
       renderContractsTable();
       renderDetail();
       renderAudit();
@@ -1033,5 +1388,8 @@ els.simulateTransactionButton.addEventListener("click", () => {
 els.addTransactionButton.addEventListener("click", addDraftTransactionToLedger);
 els.exportManualLayerButton.addEventListener("click", exportManualLayer);
 els.clearManualLayerButton.addEventListener("click", clearManualLayer);
+els.selectNextInstallmentButton.addEventListener("click", selectNextInstallment);
+els.selectAllPendingInstallmentsButton.addEventListener("click", selectAllPendingInstallments);
+els.clearInstallmentSelectionButton.addEventListener("click", clearInstallmentSelection);
 
 loadDefaultData();

@@ -52,10 +52,12 @@ As colunas de lancamento sao identificadas pelo cabecalho de cada aba. Quando um
 ## Fluxo de lancamento
 
 1. Use a aba `Transacoes` para simular eventos novos sobre um contrato.
-2. Escolha contrato, acao, data, valor, numero de parcelas, alvo, direcao e se quitou.
-3. Confira a explicacao e a simulacao dos debitos/creditos.
-4. Clique em `Adicionar a esteira`.
-5. Use a aba `Lancamentos` para filtrar, selecionar e exportar o CSV.
+2. Para pagamentos, confira as parcelas do contrato, selecione a proxima parcela ou marque varias parcelas pendentes.
+3. Confira quantas parcelas ficam pendentes apos a selecao e o total selecionado.
+4. Para ajustes sem parcela especifica, escolha acao, data, valor, numero de parcelas, alvo, direcao e se quitou.
+5. Confira a explicacao e a simulacao dos debitos/creditos.
+6. Clique em `Adicionar a esteira`.
+7. Use a aba `Lancamentos` para filtrar, selecionar e exportar o CSV.
 
 O dashboard gera uma previa com as colunas esperadas pelo arquivo de importacao contabil:
 

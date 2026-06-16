@@ -320,6 +320,48 @@ button {
   text-overflow: ellipsis;
 }
 
+.installment-summary {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(6, minmax(120px, 1fr));
+}
+
+.summary-metric {
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  display: grid;
+  gap: 4px;
+  min-height: 64px;
+  padding: 10px;
+}
+
+.summary-metric span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.summary-metric strong {
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.installments-wrap {
+  max-height: 360px;
+}
+
+.installment-row.paga {
+  color: var(--muted);
+}
+
+.installment-row.selecionada {
+  background: #ecfeff;
+}
+
+.installment-row.na-esteira {
+  background: #fff7ed;
+}
+
 .chart {
   display: flex;
   gap: 8px;
@@ -529,6 +571,162 @@ tr[data-selected="true"] {
   margin-left: 4px;
 }
 
+.contract-card {
+  display: grid;
+  gap: 16px;
+}
+
+.contract-card-head {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.contract-card-title {
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.index-pill {
+  background: #eff6ff;
+  border-radius: 999px;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 6px 10px;
+  text-transform: uppercase;
+}
+
+.contract-id-box {
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+}
+
+.contract-id-box span,
+.contract-metrics span,
+.progress-row span,
+.accounts-title {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.contract-id-box strong {
+  color: #4f67c8;
+  font-size: 24px;
+  letter-spacing: 0;
+}
+
+.contract-id-box small {
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.contract-metrics {
+  display: grid;
+  gap: 14px 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.contract-metrics div {
+  display: grid;
+  gap: 6px;
+}
+
+.contract-metrics strong {
+  color: var(--text);
+  font-size: 17px;
+  line-height: 1.35;
+}
+
+.contract-metrics small {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.installment-progress-block {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+  padding-top: 14px;
+}
+
+.progress-row,
+.progress-foot {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.progress-row strong {
+  color: var(--green);
+}
+
+.progress-track {
+  background: var(--surface-2);
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  background: #74d99f;
+  border-radius: inherit;
+  height: 100%;
+}
+
+.progress-foot {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.accounts-box {
+  background: #f8fbff;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.account-line {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr auto 24px;
+}
+
+.account-line span {
+  color: #5b73b7;
+  font-weight: 600;
+}
+
+.account-line strong {
+  color: #3653ac;
+}
+
+.account-line em {
+  color: #6b7fc9;
+  font-style: normal;
+  font-weight: 800;
+  text-align: right;
+}
+
+.contract-footer {
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+}
+
 .detail-list {
   display: grid;
   gap: 10px;
@@ -601,6 +799,10 @@ tr[data-selected="true"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .installment-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .wide-field {
     grid-column: span 2;
   }
@@ -637,7 +839,9 @@ tr[data-selected="true"] {
   }
 
   .transaction-form,
-  .snapshot-grid {
+  .snapshot-grid,
+  .contract-metrics,
+  .installment-summary {
     grid-template-columns: 1fr;
   }
 

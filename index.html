@@ -176,6 +176,36 @@
 
           <section class="panel">
             <div class="panel-header">
+              <div class="panel-title">Parcelas do contrato</div>
+              <div class="action-row">
+                <button id="selectNextInstallmentButton" class="button secondary">Selecionar proxima</button>
+                <button id="selectAllPendingInstallmentsButton" class="button secondary">Selecionar pendentes</button>
+                <button id="clearInstallmentSelectionButton" class="button secondary">Limpar parcelas</button>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div id="paymentInstallmentSummary" class="installment-summary"></div>
+            </div>
+            <div class="table-wrap installments-wrap">
+              <table id="paymentInstallmentsTable">
+                <thead>
+                  <tr>
+                    <th>Sel.</th>
+                    <th>Parcela</th>
+                    <th>Vencimento</th>
+                    <th>Principal</th>
+                    <th>Juros</th>
+                    <th>Total</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
               <div class="panel-title">Simulacao</div>
               <div id="transactionSimulationCount" class="panel-note"></div>
             </div>
@@ -184,6 +214,7 @@
                 <thead>
                   <tr>
                     <th>Data</th>
+                    <th>Parcela</th>
                     <th>Contrato</th>
                     <th>Regra</th>
                     <th>Debito</th>
@@ -211,6 +242,7 @@
                 <thead>
                   <tr>
                     <th>Data</th>
+                    <th>Parcela</th>
                     <th>Contrato</th>
                     <th>Regra</th>
                     <th>Debito</th>
@@ -285,6 +317,7 @@
                   <tr>
                     <th><input id="toggleVisibleLedger" type="checkbox" aria-label="Selecionar visiveis"></th>
                     <th>Data</th>
+                    <th>Parcela</th>
                     <th>Contrato</th>
                     <th>Regra</th>
                     <th>Debito</th>
