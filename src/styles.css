@@ -41,7 +41,7 @@ button {
 .topbar {
   background: var(--surface);
   border-bottom: 1px solid var(--line);
-  padding: 18px 24px;
+  padding: 12px 24px;
 }
 
 .topbar-inner {
@@ -116,15 +116,15 @@ button {
 }
 
 .search {
-  min-width: 260px;
+  min-width: 240px;
 }
 
 .content {
   display: grid;
-  gap: 18px;
+  gap: 14px;
   margin: 0 auto;
   max-width: 1500px;
-  padding: 20px 24px 32px;
+  padding: 16px 24px 32px;
 }
 
 .status-line,
@@ -164,7 +164,7 @@ button {
 
 .tab-panel.active {
   display: grid;
-  gap: 18px;
+  gap: 14px;
 }
 
 .kpi-grid {
@@ -208,9 +208,9 @@ button {
   border: 1px solid var(--line);
   border-radius: 8px;
   display: grid;
-  gap: 12px;
-  grid-template-columns: minmax(160px, 200px) minmax(280px, 1fr) minmax(180px, 240px);
-  padding: 12px;
+  gap: 10px;
+  grid-template-columns: minmax(150px, 180px) minmax(280px, 1fr) minmax(170px, 220px);
+  padding: 10px;
 }
 
 .panel-filter-bar label {
@@ -310,16 +310,30 @@ button {
   line-height: 1.25;
 }
 
+.dashboard-stack {
+  display: grid;
+  gap: 14px;
+}
+
 .dashboard-grid {
-  align-items: start;
   display: grid;
   gap: 18px;
-  grid-auto-flow: dense;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
 }
 
 .dashboard-grid.compact {
   grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.8fr);
+}
+
+.panel-columns {
+  align-items: start;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+}
+
+.panel-stack {
+  display: grid;
+  gap: 14px;
 }
 
 .grid-two {
@@ -338,15 +352,7 @@ button {
 }
 
 .panel-wide {
-  grid-column: span 12;
-}
-
-.panel-half {
-  grid-column: span 6;
-}
-
-.panel-third {
-  grid-column: span 4;
+  grid-column: auto;
 }
 
 .panel-header {
@@ -1128,14 +1134,8 @@ tr[data-selected="true"] {
     grid-template-columns: 1fr;
   }
 
-  .panel-wide,
-  .panel-half,
-  .panel-third {
-    grid-column: span 1;
-  }
-
-  .panel-wide {
-    grid-column: span 2;
+  .panel-columns {
+    grid-template-columns: 1fr 1fr;
   }
 
   .donut-layout {
@@ -1182,10 +1182,8 @@ tr[data-selected="true"] {
     grid-template-columns: 1fr;
   }
 
-  .panel-wide,
-  .panel-half,
-  .panel-third {
-    grid-column: auto;
+  .panel-columns {
+    grid-template-columns: 1fr;
   }
 
   .donut-layout,
