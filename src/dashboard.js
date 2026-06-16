@@ -129,6 +129,51 @@ function normalizeDate(value) {
   return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
 }
 
+function findBalancedJson(text) {
+  const source = String(text || "").trim().replace(/^\uFEFF/, "");
+  const start = [...source]
+    .map((char, index) => (char === "{" || char === "[" ? index : -1))
+    .find((index) => index >= 0);
+  if (start === undefined) return "";
+
+  const open = source[start];
+  const close = open === "{" ? "}" : "]";
+  let depth = 0;
+  let quoted = false;
+  let escaped = false;
+  for (let index = start; index < source.length; index += 1) {
+    const char = source[index];
+    if (quoted) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === "\"") {
+        quoted = false;
+      }
+    } else if (char === "\"") {
+      quoted = true;
+    } else if (char === open) {
+      depth += 1;
+    } else if (char === close) {
+      depth -= 1;
+      if (depth === 0) return source.slice(start, index + 1);
+    }
+  }
+  return "";
+}
+
+function parseJsonLike(text) {
+  const source = String(text || "").trim().replace(/^\uFEFF/, "");
+  try {
+    return JSON.parse(source);
+  } catch {
+    const jsonSlice = findBalancedJson(source);
+    if (!jsonSlice) throw new Error("Nenhum objeto JSON encontrado no arquivo.");
+    return JSON.parse(jsonSlice);
+  }
+}
+
 function fmtValueBr(value) {
   return Number(value || 0).toFixed(2).replace(".", ",");
 }
@@ -1990,12 +2035,16 @@ function importSystemState(payload) {
 async function handleSystemStateImport(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-  const payload = JSON.parse(await file.text());
-  if (payload?.schema !== SYSTEM_STATE_SCHEMA && !Array.isArray(payload?.entries)) {
-    els.status.textContent = "Arquivo de estado invalido. Use um JSON exportado por Exportar estado JSON.";
-    return;
+  try {
+    const payload = parseJsonLike(await file.text());
+    if (payload?.schema !== SYSTEM_STATE_SCHEMA && !Array.isArray(payload?.entries)) {
+      els.status.textContent = "Arquivo de estado invalido. Use um JSON exportado por Exportar estado JSON.";
+      return;
+    }
+    importSystemState(payload);
+  } catch (error) {
+    els.status.textContent = `Nao foi possivel importar o estado: ${error.message}`;
   }
-  importSystemState(payload);
   event.target.value = "";
 }
 
@@ -2109,11 +2158,15 @@ els.fileInput.addEventListener("change", async (event) => {
   const file = event.target.files[0];
   if (!file) return;
   const text = await file.text();
-  const payload = JSON.parse(text);
-  if (payload?.schema === SYSTEM_STATE_SCHEMA || Array.isArray(payload?.entries)) {
-    importSystemState(payload);
-  } else {
-    setData(payload, file.name);
+  try {
+    const payload = parseJsonLike(text);
+    if (payload?.schema === SYSTEM_STATE_SCHEMA || Array.isArray(payload?.entries)) {
+      importSystemState(payload);
+    } else {
+      setData(payload, file.name);
+    }
+  } catch (error) {
+    els.status.textContent = `Nao foi possivel carregar o arquivo: ${error.message}`;
   }
   event.target.value = "";
 });
