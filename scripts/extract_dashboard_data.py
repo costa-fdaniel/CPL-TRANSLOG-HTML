@@ -286,6 +286,171 @@ def build_audit(contracts: list[dict[str, Any]], details: list[dict[str, Any]]) 
     return audit
 
 
+def is_account_ready(account: str) -> bool:
+    if not account:
+        return False
+    lowered = account.lower()
+    if lowered in {"aaa", "quitado"}:
+        return False
+    return bool(re.fullmatch(r"\d+", account))
+
+
+def result_account_for(contract: dict[str, Any]) -> str:
+    contract_type = contract.get("type", "").lower()
+    return "4773" if "leasing" in contract_type else "375"
+
+
+def ledger_entry(
+    entries: list[dict[str, Any]],
+    contract: dict[str, Any],
+    movement: dict[str, Any],
+    rule: str,
+    debit: str,
+    credit: str,
+    value: float,
+    description: str,
+    source_column: str,
+) -> None:
+    if value is None or abs(value) < 0.005:
+        return
+    amount = float(value)
+    debit_account = debit
+    credit_account = credit
+    if amount < 0:
+        debit_account, credit_account = credit_account, debit_account
+        amount = abs(amount)
+
+    issues = []
+    if not is_account_ready(debit_account):
+        issues.append(f"Debito pendente: {debit_account or 'vazio'}")
+    if not is_account_ready(credit_account):
+        issues.append(f"Credito pendente: {credit_account or 'vazio'}")
+    if contract["status"] == "quitado":
+        issues.append("Contrato quitado")
+
+    entries.append({
+        "id": f"{contract['id']}-{movement['row']}-{rule}-{len(entries) + 1}",
+        "contractId": contract["id"],
+        "contractNumber": contract["contractNumber"],
+        "entity": contract["entity"],
+        "contractType": contract["type"],
+        "status": contract["status"],
+        "parcel": movement["parcel"],
+        "date": movement["date"],
+        "year": int(movement["date"][:4]),
+        "month": movement["date"][:7],
+        "debit": debit_account,
+        "credit": credit_account,
+        "amount": amount,
+        "historyCode": "",
+        "description": f"{description} ref. contrato {contract['contractNumber']} aba ({contract['id']})",
+        "rule": rule,
+        "sourceColumn": source_column,
+        "sourceRow": movement["row"],
+        "reviewStatus": "revisar" if issues else "pronto",
+        "issues": issues,
+    })
+
+
+def build_ledger_entries(contracts: list[dict[str, Any]], details: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    contracts_by_id = {contract["id"]: contract for contract in contracts}
+    entries: list[dict[str, Any]] = []
+
+    for detail in details:
+        if detail["replacedSheet"]:
+            continue
+        contract = contracts_by_id.get(detail["sheetId"])
+        if not contract:
+            continue
+
+        accounts = contract["accounts"]
+        conta_circ = accounts["circ"]
+        juros_circ = accounts["jurosCirc"]
+        conta_nc = accounts["naoCirc"]
+        juros_nc = accounts["jurosNaoCirc"]
+        result_account = result_account_for(contract)
+
+        for movement in detail["movements"]:
+            values = movement["values"]
+
+            if values.get("transf_circ_principal", 0) < 0:
+                ledger_entry(entries, contract, movement, "R1", conta_nc, conta_circ, abs(values["transf_circ_principal"]),
+                             "Transferencia de principal circulante para nao circulante", "AL")
+
+            if values.get("juros_nc_resultado", 0) > 0:
+                ledger_entry(entries, contract, movement, "R2", result_account, juros_nc, values["juros_nc_resultado"],
+                             "Reconhecimento de juros N-CIRC x resultado", "AM")
+
+            if "juros_nc_redutora" in values:
+                ledger_entry(entries, contract, movement, "R3", juros_nc, conta_nc, values["juros_nc_redutora"],
+                             "Provisionamento de juros N-CIRC", "AN")
+
+            if "ajuste_nc" in values:
+                ledger_entry(entries, contract, movement, "R4", "AAA", conta_nc, values["ajuste_nc"],
+                             "Ajuste do passivo nao circulante", "AO")
+
+            if values.get("juros_c_resultado", 0) > 0:
+                ledger_entry(entries, contract, movement, "R5", result_account, juros_circ, values["juros_c_resultado"],
+                             "Reconhecimento de juros CIRC x resultado", "AT")
+
+            if "juros_c_redutora" in values:
+                ledger_entry(entries, contract, movement, "R6", juros_circ, conta_circ, values["juros_c_redutora"],
+                             "Provisionamento de juros CIRC", "AU")
+
+            if values.get("amortizacao_principal", 0) < 0:
+                ledger_entry(entries, contract, movement, "R7A", conta_circ, "000", abs(values["amortizacao_principal"]),
+                             "Amortizacao de principal", "AV")
+
+            if values.get("amortizacao_juros", 0) < 0:
+                ledger_entry(entries, contract, movement, "R7B", conta_circ, "000", abs(values["amortizacao_juros"]),
+                             "Amortizacao de juros", "AW")
+
+            if "ajuste_c" in values:
+                ledger_entry(entries, contract, movement, "R8", "AAA", conta_circ, values["ajuste_c"],
+                             "Ajuste do passivo circulante", "AX")
+
+            if "ajuste_pgto" in values:
+                value = values["ajuste_pgto"]
+                if value > 0:
+                    ledger_entry(entries, contract, movement, "R9A", conta_circ, result_account, value,
+                                 "Reconhecimento de juros extras", "BA")
+                    ledger_entry(entries, contract, movement, "R9B", "000", conta_circ, value,
+                                 "Amortizacao de juros extras", "BA")
+                else:
+                    ledger_entry(entries, contract, movement, "R9C", result_account, conta_circ, abs(value),
+                                 "Desconto de juros", "BA")
+
+            if values.get("juros_nc_redutora_acum", 0) > 0:
+                ledger_entry(entries, contract, movement, "R10", result_account, juros_nc, values["juros_nc_redutora_acum"],
+                             "Impacto de juros N-CIRC", "BE")
+
+            if values.get("juros_c_redutora_acum", 0) > 0:
+                ledger_entry(entries, contract, movement, "R11", result_account, juros_circ, values["juros_c_redutora_acum"],
+                             "Impacto de juros CIRC", "BF")
+
+            if values.get("transf_contas_redutoras", 0) > 0:
+                ledger_entry(entries, contract, movement, "R12", juros_circ, juros_nc, values["transf_contas_redutoras"],
+                             "Transferencia de juros N-CIRC para CIRC", "BD")
+
+    return entries
+
+
+def summarize_ledger(entries: list[dict[str, Any]]) -> dict[str, Any]:
+    by_year: dict[str, float] = {}
+    by_rule: dict[str, float] = {}
+    for entry in entries:
+        by_year[str(entry["year"])] = by_year.get(str(entry["year"]), 0.0) + entry["amount"]
+        by_rule[entry["rule"]] = by_rule.get(entry["rule"], 0.0) + entry["amount"]
+    return {
+        "entries": len(entries),
+        "readyEntries": sum(1 for entry in entries if entry["reviewStatus"] == "pronto"),
+        "reviewEntries": sum(1 for entry in entries if entry["reviewStatus"] == "revisar"),
+        "amount": sum(entry["amount"] for entry in entries),
+        "byYear": by_year,
+        "byRule": by_rule,
+    }
+
+
 def extract(input_path: Path) -> dict[str, Any]:
     workbook = open_workbook(str(input_path))
     overview_rows = read_rows(workbook, OVERVIEW_SHEET)
@@ -296,6 +461,7 @@ def extract(input_path: Path) -> dict[str, Any]:
         if normalize_sheet_id(sheet) is not None
     ]
     details = [extract_contract_details(workbook, sheet) for sheet in detail_sheets]
+    ledger_entries = build_ledger_entries(contracts, details)
 
     payload = {
         "metadata": {
@@ -310,6 +476,8 @@ def extract(input_path: Path) -> dict[str, Any]:
         "contracts": contracts,
         "monthlySeries": sorted(monthly_series, key=lambda x: x["date"]),
         "contractDetails": details,
+        "ledgerEntries": ledger_entries,
+        "ledgerSummary": summarize_ledger(ledger_entries),
         "audit": build_audit(contracts, details),
         "rules": [
             {"column": "AL", "name": "Transferencia de principal circulante"},
@@ -350,4 +518,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -37,75 +37,191 @@
       <main class="content">
         <div id="statusLine" class="status-line">Carregando dados...</div>
 
+        <nav class="tabs" aria-label="Areas do dashboard">
+          <button class="tab-button active" data-tab="panel">Painel</button>
+          <button class="tab-button" data-tab="ledger">Lancamentos</button>
+          <button class="tab-button" data-tab="contracts">Contratos</button>
+          <button class="tab-button" data-tab="audit">Auditoria</button>
+        </nav>
+
         <section id="kpis" class="kpi-grid"></section>
 
-        <section class="grid-two">
-          <div class="panel">
-            <div class="panel-header">
-              <div class="panel-title">Fluxo mensal previsto</div>
+        <section id="panelTab" class="tab-panel active">
+          <section class="dashboard-grid">
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Fluxo mensal previsto</div>
+              </div>
+              <div class="panel-body">
+                <div id="monthlyChart" class="chart"></div>
+              </div>
             </div>
-            <div class="panel-body">
-              <div id="monthlyChart" class="chart"></div>
-            </div>
-          </div>
 
-          <div class="panel">
-            <div class="panel-header">
-              <div class="panel-title">Contrato selecionado</div>
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Composicao da divida final</div>
+              </div>
+              <div class="panel-body">
+                <div id="debtSplitChart" class="split-chart"></div>
+              </div>
             </div>
-            <div id="contractDetail" class="panel-body"></div>
-          </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Maiores contratos por divida final</div>
+              </div>
+              <div class="panel-body">
+                <div id="topContractsChart" class="rank-chart"></div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Carteira por tipo</div>
+              </div>
+              <div class="panel-body">
+                <div id="typeChart" class="rank-chart"></div>
+              </div>
+            </div>
+          </section>
         </section>
 
-        <section class="grid-two">
-          <div class="panel">
+        <section id="ledgerTab" class="tab-panel">
+          <section class="panel">
             <div class="panel-header">
-              <div class="panel-title">Contratos</div>
+              <div class="panel-title">Esteira de lancamentos</div>
+              <div class="action-row">
+                <button id="selectLedgerButton" class="button">Selecionar filtrados</button>
+                <button id="clearLedgerButton" class="button secondary">Limpar selecao</button>
+                <button id="exportLedgerButton" class="button primary">Exportar CSV</button>
+              </div>
             </div>
-            <div class="table-wrap">
-              <table id="contractsTable">
+            <div class="panel-body">
+              <div class="filter-grid">
+                <select id="ledgerYearFilter" class="select" aria-label="Ano"></select>
+                <input id="ledgerDateFrom" class="select" type="date" aria-label="Data inicial">
+                <input id="ledgerDateTo" class="select" type="date" aria-label="Data final">
+                <select id="ledgerContractFilter" class="select" aria-label="Contrato"></select>
+                <select id="ledgerRuleFilter" class="select" aria-label="Regra"></select>
+                <select id="ledgerReadyFilter" class="select" aria-label="Situacao">
+                  <option value="pronto">Prontos</option>
+                  <option value="revisar">Revisar</option>
+                  <option value="all">Todos</option>
+                </select>
+                <input id="ledgerSearchInput" class="search" type="search" placeholder="Buscar conta, descricao ou regra">
+              </div>
+            </div>
+          </section>
+
+          <section id="ledgerKpis" class="kpi-grid compact"></section>
+
+          <section class="dashboard-grid compact">
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Lancamentos por mes</div>
+              </div>
+              <div class="panel-body">
+                <div id="ledgerMonthChart" class="chart compact-chart"></div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Valor por regra</div>
+              </div>
+              <div class="panel-body">
+                <div id="ledgerRuleChart" class="rank-chart"></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Previa de importacao</div>
+              <div id="ledgerCount" class="panel-note"></div>
+            </div>
+            <div class="table-wrap ledger-wrap">
+              <table id="ledgerTable">
                 <thead>
                   <tr>
-                    <th>ID</th>
+                    <th><input id="toggleVisibleLedger" type="checkbox" aria-label="Selecionar visiveis"></th>
+                    <th>Data</th>
                     <th>Contrato</th>
-                    <th>Empresa</th>
-                    <th>Status</th>
-                    <th>Tipo</th>
-                    <th>Divida final</th>
-                    <th>Juros</th>
-                    <th>Comentario</th>
+                    <th>Regra</th>
+                    <th>Debito</th>
+                    <th>Credito</th>
+                    <th>Valor</th>
+                    <th>Situacao</th>
+                    <th>Historico</th>
                   </tr>
                 </thead>
                 <tbody></tbody>
               </table>
             </div>
-          </div>
-
-          <div class="panel">
-            <div class="panel-header">
-              <div class="panel-title">Auditoria</div>
-            </div>
-            <div class="panel-body">
-              <div id="auditList" class="audit-list"></div>
-            </div>
-          </div>
+          </section>
         </section>
 
-        <section class="panel">
-          <div class="panel-header">
-            <div class="panel-title">Regras de movimentos monitoradas</div>
-          </div>
-          <div class="table-wrap">
-            <table id="rulesTable">
-              <thead>
-                <tr>
-                  <th>Coluna</th>
-                  <th>Regra</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
+        <section id="contractsTab" class="tab-panel">
+          <section class="grid-two">
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Contratos</div>
+              </div>
+              <div class="table-wrap">
+                <table id="contractsTable">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Contrato</th>
+                      <th>Empresa</th>
+                      <th>Status</th>
+                      <th>Tipo</th>
+                      <th>Divida final</th>
+                      <th>Juros</th>
+                      <th>Comentario</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Contrato selecionado</div>
+              </div>
+              <div id="contractDetail" class="panel-body"></div>
+            </div>
+          </section>
+        </section>
+
+        <section id="auditTab" class="tab-panel">
+          <section class="grid-two">
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Auditoria</div>
+              </div>
+              <div class="panel-body">
+                <div id="auditList" class="audit-list"></div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Regras monitoradas</div>
+              </div>
+              <div class="table-wrap">
+                <table id="rulesTable">
+                  <thead>
+                    <tr>
+                      <th>Coluna</th>
+                      <th>Regra</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
         </section>
       </main>
     </div>
@@ -113,4 +229,3 @@
     <script src="src/dashboard.js"></script>
   </body>
 </html>
-
