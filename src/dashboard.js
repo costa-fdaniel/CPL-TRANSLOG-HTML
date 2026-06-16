@@ -174,6 +174,29 @@ function parseJsonLike(text) {
   }
 }
 
+function isSystemStatePayload(payload) {
+  return payload?.schema === SYSTEM_STATE_SCHEMA || Array.isArray(payload?.entries);
+}
+
+function isDashboardPayload(payload) {
+  return Array.isArray(payload?.contracts) && payload?.metadata && payload?.totals;
+}
+
+function looksLikeApplicationScript(text, fileName) {
+  const name = String(fileName || "").toLowerCase();
+  const source = String(text || "");
+  return name.endsWith("dashboard.js")
+    || (source.includes("const state =") && source.includes("document.querySelector") && source.includes("function render"));
+}
+
+function importErrorMessage(fileName, payload) {
+  const name = String(fileName || "").toLowerCase();
+  if (name.endsWith("dashboard.js") || (payload && "filteredContracts" in payload && "manualEntries" in payload)) {
+    return "Esse arquivo parece ser o codigo do sistema (src/dashboard.js), nao uma base de dados. Importe data/processed/dashboard.json ou o arquivo gerado em Exportar estado JSON.";
+  }
+  return "Arquivo nao reconhecido. Importe data/processed/dashboard.json ou um JSON gerado por Exportar estado JSON.";
+}
+
 function fmtValueBr(value) {
   return Number(value || 0).toFixed(2).replace(".", ",");
 }
@@ -2035,10 +2058,16 @@ function importSystemState(payload) {
 async function handleSystemStateImport(event) {
   const file = event.target.files?.[0];
   if (!file) return;
+  const text = await file.text();
+  if (looksLikeApplicationScript(text, file.name)) {
+    els.status.textContent = importErrorMessage(file.name, null);
+    event.target.value = "";
+    return;
+  }
   try {
-    const payload = parseJsonLike(await file.text());
-    if (payload?.schema !== SYSTEM_STATE_SCHEMA && !Array.isArray(payload?.entries)) {
-      els.status.textContent = "Arquivo de estado invalido. Use um JSON exportado por Exportar estado JSON.";
+    const payload = parseJsonLike(text);
+    if (!isSystemStatePayload(payload)) {
+      els.status.textContent = importErrorMessage(file.name, payload);
       return;
     }
     importSystemState(payload);
@@ -2158,12 +2187,19 @@ els.fileInput.addEventListener("change", async (event) => {
   const file = event.target.files[0];
   if (!file) return;
   const text = await file.text();
+  if (looksLikeApplicationScript(text, file.name)) {
+    els.status.textContent = importErrorMessage(file.name, null);
+    event.target.value = "";
+    return;
+  }
   try {
     const payload = parseJsonLike(text);
-    if (payload?.schema === SYSTEM_STATE_SCHEMA || Array.isArray(payload?.entries)) {
+    if (isSystemStatePayload(payload)) {
       importSystemState(payload);
-    } else {
+    } else if (isDashboardPayload(payload)) {
       setData(payload, file.name);
+    } else {
+      els.status.textContent = importErrorMessage(file.name, payload);
     }
   } catch (error) {
     els.status.textContent = `Nao foi possivel carregar o arquivo: ${error.message}`;
