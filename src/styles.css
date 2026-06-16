@@ -629,6 +629,21 @@ button {
   white-space: nowrap;
 }
 
+.bar-count {
+  align-self: end;
+  background: #eef3f8;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 700;
+  justify-self: center;
+  line-height: 1;
+  min-width: 20px;
+  padding: 4px 6px;
+  text-align: center;
+}
+
 #monthlyChart.chart {
   display: grid;
   gap: 10px;

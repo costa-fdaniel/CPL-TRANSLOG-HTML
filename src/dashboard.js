@@ -1165,19 +1165,23 @@ function renderLedgerKpis() {
 }
 
 function renderLedgerCharts() {
-  const byMonth = Object.entries(groupSum(
-    state.filteredLedger,
-    (entry) => entry.month,
-    (entry) => entry.amount,
-  ))
-    .map(([date, amount]) => ({ date, label: monthLabel(date), amount }))
+  const byMonth = Object.values(state.filteredLedger.reduce((acc, entry) => {
+    const date = entry.month || "-";
+    if (!acc[date]) {
+      acc[date] = { date, label: monthLabel(date), amount: 0, count: 0 };
+    }
+    acc[date].amount += entry.amount || 0;
+    acc[date].count += 1;
+    return acc;
+  }, {}))
     .sort((a, b) => a.date.localeCompare(b.date));
 
   const maxMonth = Math.max(...byMonth.map((item) => item.amount), 1);
   els.ledgerMonthChart.innerHTML = byMonth.map((item) => {
-    const height = Math.max(2, (item.amount / maxMonth) * 150);
+    const height = Math.max(2, (item.amount / maxMonth) * 128);
     return `
-      <div class="bar-wrap narrow" title="${escapeHtml(item.date)}: ${fmtMoney(item.amount, true)}">
+      <div class="bar-wrap narrow" title="${escapeHtml(item.date)}: ${fmtMoney(item.amount, true)} | ${item.count} lancamento(s)">
+        <div class="bar-count">${item.count}</div>
         <div class="bar ledger" style="height:${height}px"></div>
         <div class="bar-label">${escapeHtml(item.label)}</div>
       </div>
