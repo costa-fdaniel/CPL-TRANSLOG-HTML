@@ -12,6 +12,7 @@ const state = {
 };
 
 const MANUAL_STORAGE_KEY = "cpl-translog-html-manual-entries";
+const SYSTEM_STATE_SCHEMA = "cpl-translog-system-state";
 
 const currency = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -89,6 +90,7 @@ const els = {
   transactionSimulationCount: document.querySelector("#transactionSimulationCount"),
   manualTransactionsTable: document.querySelector("#manualTransactionsTable tbody"),
   exportManualLayerButton: document.querySelector("#exportManualLayerButton"),
+  systemStateInput: document.querySelector("#systemStateInput"),
   clearManualLayerButton: document.querySelector("#clearManualLayerButton"),
   downloadBatchTemplateButton: document.querySelector("#downloadBatchTemplateButton"),
   batchCsvInput: document.querySelector("#batchCsvInput"),
@@ -1878,9 +1880,13 @@ function addDraftTransactionToLedger() {
     renderTransactionPanel();
     return;
   }
+  const operationId = `op-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const entries = state.transactionDraftEntries.map((entry) => ({
     ...entry,
     id: `manual-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    operationId,
+    operationStatus: entry.reviewStatus === "pronto" ? "pronto" : "revisar",
+    createdAt: new Date().toISOString(),
   }));
   entries.forEach((entry) => state.selectedLedgerIds.add(entry.id));
   state.manualEntries.push(...entries);
@@ -1894,11 +1900,37 @@ function addDraftTransactionToLedger() {
 }
 
 function exportManualLayer() {
+  const payload = buildSystemStatePayload();
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "cpl-translog-estado-sistema.json";
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function buildSystemStatePayload() {
   const contracts = adjustedContracts();
-  const payload = {
+  const entries = state.manualEntries;
+  return {
+    schema: SYSTEM_STATE_SCHEMA,
+    version: 1,
     exportedAt: new Date().toISOString(),
-    count: state.manualEntries.length,
-    entries: state.manualEntries,
+    source: {
+      generatedAt: state.data?.metadata?.generatedAt || "",
+      sourceFile: state.data?.metadata?.sourceFile || "",
+      contracts: state.data?.contracts?.length || 0,
+    },
+    counts: {
+      entries: entries.length,
+      ready: entries.filter((entry) => entry.reviewStatus === "pronto").length,
+      review: entries.filter((entry) => entry.reviewStatus !== "pronto").length,
+      operations: new Set(entries.map((entry) => entry.operationId).filter(Boolean)).size,
+    },
+    entries,
     contractBalances: contracts.map((contract) => ({
       id: contract.id,
       contractNumber: contract.contractNumber,
@@ -1910,16 +1942,21 @@ function exportManualLayer() {
       interestCurrent: contract.balances.interestCurrent,
       interestNonCurrent: contract.balances.interestNonCurrent,
     })),
+    auditTrail: entries.map((entry) => ({
+      id: entry.id,
+      operationId: entry.operationId || "",
+      createdAt: entry.createdAt || "",
+      date: entry.date,
+      contractId: entry.contractId,
+      contractNumber: entry.contractNumber,
+      rule: entry.rule,
+      debit: entry.debit,
+      credit: entry.credit,
+      amount: entry.amount,
+      reviewStatus: entry.reviewStatus,
+      description: entry.description,
+    })),
   };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "cpl-translog-transacoes-html.json";
-  document.body.append(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
 }
 
 function clearManualLayer() {
@@ -1929,6 +1966,37 @@ function clearManualLayer() {
   populatePanelControls();
   populateLedgerControls();
   applyFilters();
+}
+
+function importSystemState(payload) {
+  const entries = Array.isArray(payload?.entries) ? payload.entries : [];
+  state.manualEntries = entries.map((entry) => ({
+    ...entry,
+    origin: entry.origin || "manual",
+    operationStatus: entry.operationStatus || (entry.reviewStatus === "pronto" ? "pronto" : "revisar"),
+  }));
+  state.selectedLedgerIds.clear();
+  state.selectedInstallmentKeys.clear();
+  state.transactionDraftEntries = [];
+  state.batchImportRows = [];
+  saveManualEntries();
+  populatePanelControls();
+  populateLedgerControls();
+  applyFilters();
+  renderTransactionPanel();
+  els.status.textContent = `${els.status.textContent} | estado importado: ${state.manualEntries.length} transacoes HTML`;
+}
+
+async function handleSystemStateImport(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const payload = JSON.parse(await file.text());
+  if (payload?.schema !== SYSTEM_STATE_SCHEMA && !Array.isArray(payload?.entries)) {
+    els.status.textContent = "Arquivo de estado invalido. Use um JSON exportado por Exportar estado JSON.";
+    return;
+  }
+  importSystemState(payload);
+  event.target.value = "";
 }
 
 function selectableInstallments(contract) {
@@ -2000,12 +2068,16 @@ async function handleBatchCsvImport(event) {
 }
 
 function addBatchEntriesToLedger() {
+  const operationId = `csv-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const entries = state.batchImportRows
     .filter((row) => row.status !== "erro")
     .flatMap((row) => row.entries)
     .map((entry) => ({
       ...entry,
       id: `manual-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      operationId,
+      operationStatus: entry.reviewStatus === "pronto" ? "pronto" : "revisar",
+      createdAt: new Date().toISOString(),
     }));
   if (!entries.length) {
     renderBatchImport();
@@ -2037,7 +2109,13 @@ els.fileInput.addEventListener("change", async (event) => {
   const file = event.target.files[0];
   if (!file) return;
   const text = await file.text();
-  setData(JSON.parse(text), file.name);
+  const payload = JSON.parse(text);
+  if (payload?.schema === SYSTEM_STATE_SCHEMA || Array.isArray(payload?.entries)) {
+    importSystemState(payload);
+  } else {
+    setData(payload, file.name);
+  }
+  event.target.value = "";
 });
 
 els.tabs.forEach((button) => {
@@ -2141,6 +2219,7 @@ els.simulateTransactionButton.addEventListener("click", () => {
 
 els.addTransactionButton.addEventListener("click", addDraftTransactionToLedger);
 els.exportManualLayerButton.addEventListener("click", exportManualLayer);
+els.systemStateInput.addEventListener("change", handleSystemStateImport);
 els.clearManualLayerButton.addEventListener("click", clearManualLayer);
 els.selectNextInstallmentButton.addEventListener("click", selectNextInstallment);
 els.selectAllPendingInstallmentsButton.addEventListener("click", selectAllPendingInstallments);

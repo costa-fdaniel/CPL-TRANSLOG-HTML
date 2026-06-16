@@ -13,6 +13,7 @@ Dashboard HTML para acompanhamento dos contratos financeiros da TRANSLOG/SAGA/TL
 - simulacao e registro de transacoes no HTML, com acoes de pagamento, ajuste de juros, ajuste de passivo, quitacao e lancamento manual;
 - atualizacao visual dos saldos dos contratos a partir dos lancamentos feitos/importados no proprio sistema.
 - painel inicial com filtros proprios por ano e contrato, refletindo tambem lancamentos feitos no HTML.
+- exportacao e importacao do estado operacional do sistema em JSON, incluindo transacoes HTML, saldos recalculados e trilha resumida.
 
 ## Como atualizar os dados
 
@@ -92,6 +93,17 @@ O dashboard gera uma previa com as colunas esperadas pelo arquivo de importacao 
 Parcelamento;Data;Cod. Conta Debito;Cod. Conta Credito;Valor;Cod. Historico;Complemento Historico;Inicia Lote;Codigo Matriz/Filial;Centro de Custo Debito;Centro de Custo Credito
 ```
 
-As transacoes feitas no HTML ficam salvas no navegador como camada local. Elas entram na previa, na exportacao contabil e recalculam os saldos apresentados no Painel/Contratos. Use `Exportar camada JSON` para salvar um backup dessas transacoes manuais e dos saldos atualizados por contrato.
+As transacoes feitas no HTML ficam salvas no navegador como camada local. Elas entram na previa, na exportacao contabil e recalculam os saldos apresentados no Painel/Contratos. Use `Exportar estado JSON` para salvar um backup dessas transacoes manuais e dos saldos atualizados por contrato.
 
 O JSON extraido continua sendo a carga inicial historica. A operacao diaria pode acontecer no HTML por lancamento manual ou importacao CSV; para uma substituicao completa da planilha, a proxima evolucao natural e persistir essa camada em arquivo/base de dados compartilhada e transformar as formulas de juros/amortizacao em um motor financeiro versionado no proprio projeto.
+
+## Estado do sistema
+
+Na aba `Transacoes`, use `Exportar estado JSON` para gerar um backup operacional completo da camada HTML. Esse arquivo inclui:
+
+- transacoes feitas ou importadas no HTML;
+- status de revisao dos lancamentos;
+- saldos recalculados por contrato;
+- trilha resumida com data, contrato, regra, debito, credito, valor e historico.
+
+Use `Importar estado JSON` para restaurar esse arquivo em outro navegador ou em outro momento. O botao `Carregar JSON` tambem reconhece esse arquivo de estado; quando ele for importado, a camada local e os saldos exibidos sao atualizados.
