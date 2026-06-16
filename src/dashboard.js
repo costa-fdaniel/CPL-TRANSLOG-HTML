@@ -9,6 +9,7 @@ const state = {
   transactionDraftEntries: [],
   batchImportRows: [],
   panelControlsInitialized: false,
+  pendingSystemState: null,
 };
 
 const MANUAL_STORAGE_KEY = "cpl-translog-html-manual-entries";
@@ -550,6 +551,10 @@ function setData(data, sourceLabel) {
   state.panelControlsInitialized = false;
   loadManualEntries();
   els.status.textContent = `${sourceLabel} | ${data.totals.contracts} contratos | gerado em ${data.metadata.generatedAt}`;
+  if (state.pendingSystemState) {
+    els.status.textContent += ` | estado aplicado: ${state.manualEntries.length} transacoes HTML`;
+    state.pendingSystemState = null;
+  }
   populatePanelControls();
   populateLedgerControls();
   populateTransactionControls();
@@ -2048,6 +2053,11 @@ function importSystemState(payload) {
   state.transactionDraftEntries = [];
   state.batchImportRows = [];
   saveManualEntries();
+  if (!state.data?.contracts?.length) {
+    state.pendingSystemState = payload;
+    els.status.textContent = `Estado importado com ${state.manualEntries.length} transacoes HTML. Carregue data/processed/dashboard.json para aplicar aos contratos.`;
+    return;
+  }
   populatePanelControls();
   populateLedgerControls();
   applyFilters();
