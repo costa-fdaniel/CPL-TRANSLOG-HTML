@@ -311,6 +311,7 @@ button {
 }
 
 .dashboard-grid {
+  align-items: start;
   display: grid;
   gap: 18px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -327,6 +328,7 @@ button {
 }
 
 .panel {
+  align-self: start;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -355,6 +357,7 @@ button {
 }
 
 .panel-body {
+  min-height: 0;
   padding: 14px;
 }
 
@@ -573,6 +576,7 @@ button {
   display: grid;
   gap: 18px;
   grid-template-columns: minmax(150px, 190px) 1fr;
+  min-height: 220px;
 }
 
 .donut {
@@ -670,6 +674,11 @@ button {
   gap: 10px;
 }
 
+#entityChart.rank-chart,
+#typeChart.rank-chart {
+  gap: 14px;
+}
+
 .rank-row {
   align-items: center;
   background: transparent;
@@ -739,6 +748,7 @@ button {
 .review-chart {
   display: grid;
   gap: 14px;
+  min-height: 140px;
 }
 
 .review-track {
