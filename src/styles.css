@@ -324,6 +324,37 @@ button {
   grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.8fr);
 }
 
+.ledger-visual-grid {
+  align-items: start;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(340px, 1.1fr);
+}
+
+.ledger-month-panel .panel-body,
+.ledger-rule-panel .panel-body {
+  padding: 10px 12px 12px;
+}
+
+.ledger-month-panel .compact-chart {
+  height: 150px;
+  overflow: hidden;
+  padding-top: 0;
+}
+
+.ledger-month-panel .bar-wrap {
+  flex-basis: 34px;
+  gap: 5px;
+}
+
+.ledger-rule-panel .rank-chart {
+  gap: 7px;
+}
+
+.ledger-rule-panel .rank-row {
+  min-height: 28px;
+}
+
 .panel-columns {
   align-items: start;
   display: grid;
@@ -1118,6 +1149,10 @@ tr[data-selected="true"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .ledger-visual-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
   .filter-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -1179,6 +1214,10 @@ tr[data-selected="true"] {
   }
 
   .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ledger-visual-grid {
     grid-template-columns: 1fr;
   }
 
