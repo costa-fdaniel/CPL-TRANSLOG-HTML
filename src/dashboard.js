@@ -8,6 +8,7 @@ const state = {
   manualEntries: [],
   transactionDraftEntries: [],
   batchImportRows: [],
+  panelControlsInitialized: false,
 };
 
 const MANUAL_STORAGE_KEY = "cpl-translog-html-manual-entries";
@@ -33,6 +34,8 @@ const els = {
   tabs: document.querySelectorAll(".tab-button"),
   tabPanels: document.querySelectorAll(".tab-panel"),
   kpis: document.querySelector("#kpis"),
+  panelYearFilter: document.querySelector("#panelYearFilter"),
+  panelContractFilter: document.querySelector("#panelContractFilter"),
   panelSummary: document.querySelector("#panelSummary"),
   monthlyChart: document.querySelector("#monthlyChart"),
   debtSplitChart: document.querySelector("#debtSplitChart"),
@@ -202,6 +205,40 @@ function entriesFromGroup(group) {
 
 function allLedgerEntries() {
   return [...(state.data?.ledgerEntries || []), ...state.manualEntries];
+}
+
+function monthLabel(monthKey) {
+  const [year, month] = String(monthKey || "").split("-");
+  const labels = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+  const index = Number(month) - 1;
+  if (!year || index < 0 || index > 11) return monthKey || "-";
+  return `${labels[index]}/${year.slice(-2)}`;
+}
+
+function panelFilterValues() {
+  return {
+    year: els.panelYearFilter?.value || "all",
+    contractId: els.panelContractFilter?.value || "all",
+  };
+}
+
+function panelLedgerEntries() {
+  const { year, contractId } = panelFilterValues();
+  const status = els.statusFilter.value;
+  const entity = els.entityFilter.value;
+  return allLedgerEntries()
+    .filter((entry) => status === "all" || entry.status === status)
+    .filter((entry) => entity === "all" || entry.entity === entity)
+    .filter((entry) => year === "all" || String(entry.year) === year)
+    .filter((entry) => contractId === "all" || String(entry.contractId) === contractId);
+}
+
+function panelContracts() {
+  const { year, contractId } = panelFilterValues();
+  const visibleIds = new Set(panelLedgerEntries().map((entry) => entry.contractId));
+  return state.filteredContracts
+    .filter((contract) => contractId === "all" || String(contract.id) === contractId)
+    .filter((contract) => year === "all" || contractId !== "all" || visibleIds.has(contract.id));
 }
 
 function manualImpactFor(contract) {
@@ -427,13 +464,41 @@ function setData(data, sourceLabel) {
   state.selectedLedgerIds.clear();
   state.selectedInstallmentKeys.clear();
   state.transactionDraftEntries = [];
+  state.panelControlsInitialized = false;
   loadManualEntries();
   els.status.textContent = `${sourceLabel} | ${data.totals.contracts} contratos | gerado em ${data.metadata.generatedAt}`;
+  populatePanelControls();
   populateLedgerControls();
   populateTransactionControls();
   applyFilters();
   renderRules();
   renderTransactionPanel();
+}
+
+function populatePanelControls() {
+  const previousYear = els.panelYearFilter.value;
+  const previousContract = els.panelContractFilter.value;
+  const years = [...new Set(allLedgerEntries().map((entry) => entry.year).filter(Boolean))].sort((a, b) => a - b);
+  els.panelYearFilter.innerHTML = `<option value="all">Todos os anos</option>`
+    + years.map((year) => `<option value="${year}">${year}</option>`).join("");
+  if (!state.panelControlsInitialized && years.length) {
+    const currentYear = new Date().getFullYear();
+    els.panelYearFilter.value = years.includes(currentYear) ? String(currentYear) : String(years[years.length - 1]);
+    state.panelControlsInitialized = true;
+  } else if (years.map(String).includes(previousYear) || previousYear === "all") {
+    els.panelYearFilter.value = previousYear || "all";
+  } else if (years.length) {
+    els.panelYearFilter.value = String(years[years.length - 1]);
+  }
+
+  const contracts = [...state.data.contracts].sort((a, b) => a.id - b.id);
+  els.panelContractFilter.innerHTML = `<option value="all">Todos os contratos</option>`
+    + contracts.map((contract) => (
+      `<option value="${contract.id}">${contract.id} - ${escapeHtml(contract.contractNumber)} (${escapeHtml(contract.entity)})</option>`
+    )).join("");
+  if ([...els.panelContractFilter.options].some((option) => option.value === previousContract)) {
+    els.panelContractFilter.value = previousContract;
+  }
 }
 
 function populateLedgerControls() {
@@ -607,8 +672,9 @@ function renderPanelCharts() {
 }
 
 function renderPanelSummary() {
-  const contracts = state.filteredContracts;
-  const entries = state.manualEntries;
+  const contracts = panelContracts();
+  const entries = panelLedgerEntries();
+  const manualEntries = entries.filter((entry) => entry.origin === "manual");
   const finalDebt = sum(contracts, (contract) => contract.balances.finalDebt);
   const originalDebt = sum(
     state.data.contracts.filter((contract) => contracts.some((item) => item.id === contract.id)),
@@ -617,6 +683,7 @@ function renderPanelSummary() {
   const principalImpact = finalDebt - originalDebt;
   const pendingInstallments = sum(contracts, (contract) => contractInstallmentStats(contract).pendingAfterSelection);
   const reviewCount = entries.filter((entry) => entry.reviewStatus === "revisar").length;
+  const ledgerAmount = sum(entries, (entry) => entry.amount);
   els.panelSummary.innerHTML = `
     <div class="summary-hero">
       <span>Saldo atualizado no sistema</span>
@@ -628,38 +695,45 @@ function renderPanelSummary() {
       <strong>${pendingInstallments}</strong>
     </div>
     <div class="summary-tile">
-      <span>Lancamentos HTML</span>
-      <strong>${entries.length}</strong>
+      <span>Fluxo filtrado</span>
+      <strong>${fmtMoney(ledgerAmount)}</strong>
+      <small>${entries.length} lancamento(s)</small>
     </div>
     <div class="summary-tile">
-      <span>A revisar</span>
-      <strong>${reviewCount}</strong>
+      <span>HTML / revisar</span>
+      <strong>${manualEntries.length} / ${reviewCount}</strong>
     </div>
   `;
 }
 
 function renderMonthlyChart() {
+  const entries = panelLedgerEntries();
   const series = entriesFromGroup(groupSum(
-    allLedgerEntries(),
+    entries,
     (entry) => entry.month,
     (entry) => entry.amount,
   ))
     .sort((a, b) => a.label.localeCompare(b.label))
-    .map((item) => ({ label: item.label, amount: item.value }));
+    .map((item) => ({ label: item.label, display: monthLabel(item.label), amount: item.value }));
+  if (!series.length) {
+    els.monthlyChart.innerHTML = `<div class="empty-state">Sem fluxo para o filtro atual.</div>`;
+    return;
+  }
   const max = Math.max(...series.map((item) => item.amount), 1);
   els.monthlyChart.innerHTML = series.map((item) => {
-    const height = Math.max(2, (item.amount / max) * 180);
+    const height = Math.max(3, (item.amount / max) * 100);
     return `
       <div class="bar-wrap" title="${escapeHtml(item.label)}: ${fmtMoney(item.amount, true)}">
-        <div class="bar" style="height:${height}px"></div>
-        <div class="bar-label">${escapeHtml(item.label.slice(0, 2))}</div>
+        <div class="bar-value">${fmtMoney(item.amount)}</div>
+        <div class="bar" style="height:${height}%"></div>
+        <div class="bar-label">${escapeHtml(item.display)}</div>
       </div>
     `;
   }).join("");
 }
 
 function renderDebtSplit() {
-  const contracts = state.filteredContracts;
+  const contracts = panelContracts();
   const current = sum(contracts, (contract) => Math.max(0, contract.balances.currentFinal));
   const nonCurrent = sum(contracts, (contract) => Math.max(0, contract.balances.nonCurrentFinal));
   const total = Math.max(current + nonCurrent, 1);
@@ -679,7 +753,7 @@ function renderDebtSplit() {
 }
 
 function renderTopContractsChart() {
-  const items = state.filteredContracts
+  const items = panelContracts()
     .filter((contract) => contract.balances.finalDebt > 0)
     .slice(0, 10)
     .map((contract) => ({
@@ -691,7 +765,7 @@ function renderTopContractsChart() {
 
 function renderTypeChart() {
   const items = entriesFromGroup(groupSum(
-    state.filteredContracts,
+    panelContracts(),
     (contract) => contract.type || "Sem tipo",
     (contract) => contract.balances.finalDebt,
   )).slice(0, 10);
@@ -1617,6 +1691,7 @@ function addDraftTransactionToLedger() {
   state.transactionDraftEntries = [];
   state.selectedInstallmentKeys.clear();
   els.ledgerReadyFilter.value = "all";
+  populatePanelControls();
   populateLedgerControls();
   applyFilters();
 }
@@ -1654,6 +1729,7 @@ function clearManualLayer() {
   state.manualEntries = [];
   state.selectedLedgerIds.clear();
   saveManualEntries();
+  populatePanelControls();
   populateLedgerControls();
   applyFilters();
 }
@@ -1739,6 +1815,7 @@ function addBatchEntriesToLedger() {
   if (els.batchCsvInput) els.batchCsvInput.value = "";
   saveManualEntries();
   els.ledgerReadyFilter.value = "all";
+  populatePanelControls();
   populateLedgerControls();
   applyFilters();
 }
@@ -1768,6 +1845,13 @@ els.tabs.forEach((button) => {
 els.search.addEventListener("input", applyFilters);
 els.statusFilter.addEventListener("change", applyFilters);
 els.entityFilter.addEventListener("change", applyFilters);
+
+[
+  els.panelYearFilter,
+  els.panelContractFilter,
+].forEach((control) => {
+  control.addEventListener("change", renderPanelCharts);
+});
 
 [
   els.ledgerYearFilter,

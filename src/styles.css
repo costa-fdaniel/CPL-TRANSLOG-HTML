@@ -203,6 +203,25 @@ button {
   grid-template-columns: minmax(300px, 1.4fr) repeat(3, minmax(150px, 0.55fr));
 }
 
+.panel-filter-bar {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(180px, 220px) minmax(280px, 1fr);
+  padding: 12px;
+}
+
+.panel-filter-bar label {
+  color: var(--muted);
+  display: grid;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 6px;
+  text-transform: uppercase;
+}
+
 .summary-hero,
 .summary-tile {
   background: var(--surface);
@@ -243,6 +262,12 @@ button {
   color: var(--ink);
   font-size: 24px;
   line-height: 1.1;
+}
+
+.summary-tile small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .workflow-strip {
@@ -494,6 +519,44 @@ button {
   font-size: 11px;
   text-align: center;
   white-space: nowrap;
+}
+
+.bar-value {
+  color: var(--muted);
+  font-size: 10px;
+  min-height: 14px;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#monthlyChart.chart {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
+  height: auto;
+  min-height: 260px;
+  overflow: visible;
+  padding: 4px 0 0;
+}
+
+#monthlyChart .bar-wrap {
+  display: grid;
+  gap: 7px;
+  grid-template-rows: auto 170px auto;
+  min-width: 0;
+}
+
+#monthlyChart .bar {
+  align-self: end;
+  width: 100%;
+}
+
+#monthlyChart .bar-label {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .split-chart {
@@ -886,6 +949,7 @@ tr[data-selected="true"] {
 @media (max-width: 1180px) {
   .kpi-grid,
   .kpi-grid.compact,
+  .panel-filter-bar,
   .panel-summary,
   .dashboard-grid,
   .dashboard-grid.compact,
@@ -937,6 +1001,7 @@ tr[data-selected="true"] {
 
   .kpi-grid,
   .kpi-grid.compact,
+  .panel-filter-bar,
   .panel-summary,
   .dashboard-grid,
   .dashboard-grid.compact,

@@ -12,6 +12,7 @@ Dashboard HTML para acompanhamento dos contratos financeiros da TRANSLOG/SAGA/TL
 - exportacao CSV dos lancamentos selecionados ou filtrados;
 - simulacao e registro de transacoes no HTML, com acoes de pagamento, ajuste de juros, ajuste de passivo, quitacao e lancamento manual;
 - atualizacao visual dos saldos dos contratos a partir dos lancamentos feitos/importados no proprio sistema.
+- painel inicial com filtros proprios por ano e contrato, refletindo tambem lancamentos feitos no HTML.
 
 ## Como atualizar os dados
 
@@ -60,6 +61,10 @@ As colunas de lancamento sao identificadas pelo cabecalho de cada aba. Quando um
 6. Clique em `Adicionar a esteira`.
 7. O Painel, a aba Contratos e o detalhe do contrato passam a refletir o saldo ajustado pela camada HTML.
 8. Use a aba `Lancamentos` para filtrar, selecionar e exportar o CSV contabil.
+
+## Leitura do painel
+
+O `Painel` abre no ano corrente quando esse ano existe na base e permite trocar para qualquer ano ou contrato especifico. Os cartoes, composicao da divida, maiores contratos, carteira por tipo e fluxo mensal usam essa selecao. Quando uma transacao e adicionada ou um CSV em lote e importado, a visao do painel e recalculada junto com a esteira.
 
 ## Importacao em lote
 
