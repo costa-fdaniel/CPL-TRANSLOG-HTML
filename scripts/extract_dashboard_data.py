@@ -4,6 +4,7 @@ import argparse
 import json
 import math
 import re
+import unicodedata
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -14,7 +15,7 @@ from pyxlsb import open_workbook
 OVERVIEW_SHEET = "Overview"
 SUMMARY_SHEET = "Resumo 2025"
 
-KNOWN_MOVEMENT_COLUMNS = {
+DEFAULT_MOVEMENT_COLUMNS = {
     "AL": (38, "transf_circ_principal"),
     "AM": (39, "juros_nc_resultado"),
     "AN": (40, "juros_nc_redutora"),
@@ -25,12 +26,32 @@ KNOWN_MOVEMENT_COLUMNS = {
     "AW": (49, "amortizacao_juros"),
     "AX": (50, "ajuste_c"),
     "BA": (53, "ajuste_pgto"),
-    "BB": (54, "regra_ajuste_nc"),
-    "BC": (55, "regra_ajuste_c"),
     "BD": (56, "transf_contas_redutoras"),
     "BE": (57, "juros_nc_redutora_acum"),
     "BF": (58, "juros_c_redutora_acum"),
 }
+
+MOVEMENT_LABELS = {
+    "transf_circ_principal": ("TRANSF. CIRCULANTE", "PRINCIPAL"),
+    "juros_nc_resultado": ("JUROS NC X RESULTADO",),
+    "juros_nc_redutora": ("JUROS NC X REDUTORA NC",),
+    "ajuste_nc": ("AJUSTE NC",),
+    "juros_c_resultado": ("JUROS C X RESULTADO",),
+    "juros_c_redutora": ("JUROS C X REDUTORA C",),
+    "amortizacao_principal": ("AMORTIZACAO (PRINCIPAL)",),
+    "amortizacao_juros": ("AMORTIZACAO (JUROS)",),
+    "ajuste_c": ("AJUSTE C",),
+    "ajuste_pgto": ("AJUSTE NO PGTO",),
+    "transf_contas_redutoras": ("TRANSFERENCIA ENTRE CONTAS REDUTORAS",),
+    "juros_nc_redutora_acum": ("(-) JUROS N-CIRC CONTA REDUTORA",),
+    "juros_c_redutora_acum": ("(-) JUROS CIRC CONTA REDUTORA",),
+}
+
+MARKER_LABELS = {
+    "dc": ("D/C",),
+}
+
+TEXT_MARKER_COLUMNS = {53, 54, 55}
 
 
 def clean_text(value: Any) -> str:
@@ -38,6 +59,12 @@ def clean_text(value: Any) -> str:
         return ""
     text = str(value).replace("\xa0", " ").strip()
     return re.sub(r"\s+", " ", text)
+
+
+def normalize_label(value: Any) -> str:
+    text = unicodedata.normalize("NFD", clean_text(value))
+    text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
+    return text.upper()
 
 
 def is_blank(value: Any) -> bool:
@@ -93,6 +120,103 @@ def normalize_sheet_id(name: str) -> int | None:
     return int(match.group(1)) if match else None
 
 
+def column_letter(col_number: int) -> str:
+    result = ""
+    while col_number:
+        col_number, remainder = divmod(col_number - 1, 26)
+        result = chr(65 + remainder) + result
+    return result
+
+
+def find_schedule_header_row(rows: list[list[Any]]) -> int | None:
+    for row_idx in range(13, min(18, len(rows))):
+        row = rows[row_idx]
+        for col_idx in range(20, min(37, len(row))):
+            if clean_text(get(row, col_idx)) == "Juros / Resultado":
+                return row_idx
+    return None
+
+
+def header_text_at(rows: list[list[Any]], header_row: int, col_idx: int) -> str:
+    pieces = []
+    for row_idx in range(max(0, header_row - 2), min(len(rows), header_row + 3)):
+        text = normalize_label(get(rows[row_idx], col_idx))
+        if text:
+            pieces.append(text)
+    return " ".join(pieces)
+
+
+def detect_columns_by_label(
+    rows: list[list[Any]],
+    header_row: int | None,
+    labels: dict[str, tuple[str, ...]],
+) -> dict[str, int]:
+    if header_row is None:
+        return {}
+
+    detected: dict[str, int] = {}
+    max_width = max((len(row) for row in rows[: min(len(rows), header_row + 3)]), default=0)
+    for key, tokens in labels.items():
+        normalized_tokens = tuple(normalize_label(token) for token in tokens)
+        for col_idx in range(20, min(max_width, 62)):
+            text = header_text_at(rows, header_row, col_idx)
+            if all(token in text for token in normalized_tokens):
+                detected[key] = col_idx
+                break
+    return detected
+
+
+def default_columns_by_key() -> dict[str, dict[str, Any]]:
+    columns: dict[str, dict[str, Any]] = {}
+    for letter, (col_number, key) in DEFAULT_MOVEMENT_COLUMNS.items():
+        columns[key] = {
+            "index": col_number - 1,
+            "letter": letter,
+            "defaultLetter": letter,
+            "dynamic": False,
+        }
+    return columns
+
+
+def detect_movement_columns(rows: list[list[Any]]) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
+    header_row = find_schedule_header_row(rows)
+    columns = default_columns_by_key()
+    detected = detect_columns_by_label(rows, header_row, MOVEMENT_LABELS)
+    marker_columns = detect_columns_by_label(rows, header_row, MARKER_LABELS)
+    layout_changes = []
+    missing_labels = []
+
+    for key, meta in columns.items():
+        if key not in detected:
+            missing_labels.append(key)
+            continue
+        detected_index = detected[key]
+        detected_letter = column_letter(detected_index + 1)
+        if detected_index != meta["index"]:
+            layout_changes.append({
+                "key": key,
+                "default": meta["letter"],
+                "detected": detected_letter,
+            })
+        meta["index"] = detected_index
+        meta["letter"] = detected_letter
+        meta["dynamic"] = detected_index != (DEFAULT_MOVEMENT_COLUMNS[meta["defaultLetter"]][0] - 1)
+
+    markers = {
+        key: {
+            "index": col_idx,
+            "letter": column_letter(col_idx + 1),
+        }
+        for key, col_idx in marker_columns.items()
+    }
+    return columns, {
+        "headerRow": header_row + 1 if header_row is not None else None,
+        "markers": markers,
+        "layoutChanges": layout_changes,
+        "missingLabels": missing_labels,
+    }
+
+
 def read_rows(workbook: Any, sheet_name: str) -> list[list[Any]]:
     rows: list[list[Any]] = []
     with workbook.get_sheet(sheet_name) as sheet:
@@ -122,7 +246,8 @@ def extract_overview(rows: list[list[Any]]) -> tuple[list[dict[str, Any]], list[
         comments = clean_text(get(row, 14))
         accounts = [as_account(get(row, idx)) for idx in (3, 4, 5, 6)]
         is_quitado = "quitado" in comments.lower() or any(a.lower() == "quitado" for a in accounts)
-        entity = "TLOG" if contract_id >= 136 else "SAGA"
+        entity_marker = clean_text(get(row, 0)).upper()
+        entity = "TLOG" if entity_marker == "T" or (not entity_marker and contract_id >= 136) else "SAGA"
         monthly = []
         for col in month_columns:
             amount = as_number(get(row, col["index"]))
@@ -132,6 +257,7 @@ def extract_overview(rows: list[list[Any]]) -> tuple[list[dict[str, Any]], list[
             "id": int(contract_id),
             "contractNumber": as_account(get(row, 2)),
             "entity": entity,
+            "entityMarker": entity_marker,
             "status": "quitado" if is_quitado else "ativo",
             "type": clean_text(get(row, 15)),
             "comments": comments,
@@ -186,10 +312,26 @@ def extract_overview(rows: list[list[Any]]) -> tuple[list[dict[str, Any]], list[
 
 def extract_contract_details(workbook: Any, sheet_name: str) -> dict[str, Any]:
     rows = read_rows(workbook, sheet_name)
+    movement_columns, layout = detect_movement_columns(rows)
     details: dict[str, Any] = {
         "sheet": sheet_name,
         "sheetId": normalize_sheet_id(sheet_name),
         "replacedSheet": sheet_name.endswith("(X)"),
+        "headerRow": layout["headerRow"],
+        "movementColumns": {
+            key: {
+                "letter": meta["letter"],
+                "defaultLetter": meta["defaultLetter"],
+                "dynamic": meta["dynamic"],
+            }
+            for key, meta in movement_columns.items()
+        },
+        "markerColumns": {
+            key: {"letter": meta["letter"]}
+            for key, meta in layout["markers"].items()
+        },
+        "layoutChanges": layout["layoutChanges"],
+        "missingLabels": layout["missingLabels"],
         "general": {},
         "movements": [],
         "warnings": [],
@@ -227,15 +369,30 @@ def extract_contract_details(workbook: Any, sheet_name: str) -> dict[str, Any]:
             "date": date_value,
             "values": {},
         }
-        for letter, (col_number, key) in KNOWN_MOVEMENT_COLUMNS.items():
-            value = as_number(get(row, col_number - 1))
+        for key, meta in movement_columns.items():
+            value = as_number(get(row, meta["index"]))
             if value is not None and abs(value) >= 0.005:
                 movement["values"][key] = value
+        marker_indexes = set(TEXT_MARKER_COLUMNS)
+        marker_indexes.update(meta["index"] + 1 for meta in layout["markers"].values())
+        text_markers = {}
+        for col_number in sorted(marker_indexes):
+            text = clean_text(get(row, col_number - 1))
+            if text and as_number(text) is None:
+                text_markers[column_letter(col_number)] = text
+        if text_markers:
+            movement["textMarkers"] = text_markers
         if movement["values"]:
             details["movements"].append(movement)
 
     if details["replacedSheet"]:
         details["warnings"].append("Aba marcada como substituida no arquivo.")
+    if details["layoutChanges"]:
+        changed = ", ".join(
+            f"{item['key']} {item['default']}->{item['detected']}"
+            for item in details["layoutChanges"]
+        )
+        details["warnings"].append(f"Layout de colunas diferente do padrao: {changed}.")
     if not details["movements"]:
         details["warnings"].append("Nenhum movimento com valor relevante encontrado.")
     return details
@@ -272,16 +429,24 @@ def build_audit(contracts: list[dict[str, Any]], details: list[dict[str, Any]]) 
                 "contractId": sheet_id,
                 "message": f"Aba {detail['sheet']} preservada como substituida.",
             })
+            continue
         if sheet_id and sheet_id in contract_by_id:
-            has_adjustment_rule = any(
-                "regra_ajuste_nc" in m["values"] or "regra_ajuste_c" in m["values"]
-                for m in detail["movements"]
-            )
-            if has_adjustment_rule:
+            if detail.get("layoutChanges"):
+                changes = ", ".join(
+                    f"{item['key']} {item['default']}->{item['detected']}"
+                    for item in detail["layoutChanges"]
+                )
                 audit.append({
                     "severity": "warning",
                     "contractId": sheet_id,
-                    "message": "Movimentos com regras BB/BC identificados; conferir ajuste NC/C.",
+                    "message": f"Aba {detail['sheet']} usa layout diferente do padrao: {changes}.",
+                })
+            marker_count = sum(1 for m in detail["movements"] if m.get("textMarkers"))
+            if marker_count:
+                audit.append({
+                    "severity": "warning",
+                    "contractId": sheet_id,
+                    "message": f"{marker_count} movimento(s) com marcadores textuais/D-C; conferir ajuste especial.",
                 })
     return audit
 
@@ -352,6 +517,10 @@ def ledger_entry(
     })
 
 
+def source_column_for(detail: dict[str, Any], key: str, fallback: str) -> str:
+    return detail.get("movementColumns", {}).get(key, {}).get("letter", fallback)
+
+
 def build_ledger_entries(contracts: list[dict[str, Any]], details: list[dict[str, Any]]) -> list[dict[str, Any]]:
     contracts_by_id = {contract["id"]: contract for contract in contracts}
     entries: list[dict[str, Any]] = []
@@ -375,62 +544,77 @@ def build_ledger_entries(contracts: list[dict[str, Any]], details: list[dict[str
 
             if values.get("transf_circ_principal", 0) < 0:
                 ledger_entry(entries, contract, movement, "R1", conta_nc, conta_circ, abs(values["transf_circ_principal"]),
-                             "Transferencia de principal circulante para nao circulante", "AL")
+                             "Transferencia de principal nao circulante para circulante",
+                             source_column_for(detail, "transf_circ_principal", "AL"))
 
             if values.get("juros_nc_resultado", 0) > 0:
                 ledger_entry(entries, contract, movement, "R2", result_account, juros_nc, values["juros_nc_resultado"],
-                             "Reconhecimento de juros N-CIRC x resultado", "AM")
+                             "Reconhecimento de juros N-CIRC x resultado",
+                             source_column_for(detail, "juros_nc_resultado", "AM"))
 
             if "juros_nc_redutora" in values:
                 ledger_entry(entries, contract, movement, "R3", juros_nc, conta_nc, values["juros_nc_redutora"],
-                             "Provisionamento de juros N-CIRC", "AN")
+                             "Provisionamento de juros N-CIRC",
+                             source_column_for(detail, "juros_nc_redutora", "AN"))
 
             if "ajuste_nc" in values:
                 ledger_entry(entries, contract, movement, "R4", "AAA", conta_nc, values["ajuste_nc"],
-                             "Ajuste do passivo nao circulante", "AO")
+                             "Ajuste do passivo nao circulante",
+                             source_column_for(detail, "ajuste_nc", "AO"))
 
             if values.get("juros_c_resultado", 0) > 0:
                 ledger_entry(entries, contract, movement, "R5", result_account, juros_circ, values["juros_c_resultado"],
-                             "Reconhecimento de juros CIRC x resultado", "AT")
+                             "Reconhecimento de juros CIRC x resultado",
+                             source_column_for(detail, "juros_c_resultado", "AT"))
 
             if "juros_c_redutora" in values:
                 ledger_entry(entries, contract, movement, "R6", juros_circ, conta_circ, values["juros_c_redutora"],
-                             "Provisionamento de juros CIRC", "AU")
+                             "Provisionamento de juros CIRC",
+                             source_column_for(detail, "juros_c_redutora", "AU"))
 
             if values.get("amortizacao_principal", 0) < 0:
                 ledger_entry(entries, contract, movement, "R7A", conta_circ, "000", abs(values["amortizacao_principal"]),
-                             "Amortizacao de principal", "AV")
+                             "Amortizacao de principal",
+                             source_column_for(detail, "amortizacao_principal", "AV"))
 
             if values.get("amortizacao_juros", 0) < 0:
                 ledger_entry(entries, contract, movement, "R7B", conta_circ, "000", abs(values["amortizacao_juros"]),
-                             "Amortizacao de juros", "AW")
+                             "Amortizacao de juros",
+                             source_column_for(detail, "amortizacao_juros", "AW"))
 
             if "ajuste_c" in values:
                 ledger_entry(entries, contract, movement, "R8", "AAA", conta_circ, values["ajuste_c"],
-                             "Ajuste do passivo circulante", "AX")
+                             "Ajuste do passivo circulante",
+                             source_column_for(detail, "ajuste_c", "AX"))
 
             if "ajuste_pgto" in values:
                 value = values["ajuste_pgto"]
                 if value > 0:
                     ledger_entry(entries, contract, movement, "R9A", conta_circ, result_account, value,
-                                 "Reconhecimento de juros extras", "BA")
+                                 "Reconhecimento de juros extras",
+                                 source_column_for(detail, "ajuste_pgto", "BA"))
                     ledger_entry(entries, contract, movement, "R9B", "000", conta_circ, value,
-                                 "Amortizacao de juros extras", "BA")
+                                 "Amortizacao de juros extras",
+                                 source_column_for(detail, "ajuste_pgto", "BA"))
                 else:
                     ledger_entry(entries, contract, movement, "R9C", result_account, conta_circ, abs(value),
-                                 "Desconto de juros", "BA")
+                                 "Desconto de juros",
+                                 source_column_for(detail, "ajuste_pgto", "BA"))
 
             if values.get("juros_nc_redutora_acum", 0) > 0:
                 ledger_entry(entries, contract, movement, "R10", result_account, juros_nc, values["juros_nc_redutora_acum"],
-                             "Impacto de juros N-CIRC", "BE")
+                             "Impacto de juros N-CIRC",
+                             source_column_for(detail, "juros_nc_redutora_acum", "BE"))
 
             if values.get("juros_c_redutora_acum", 0) > 0:
                 ledger_entry(entries, contract, movement, "R11", result_account, juros_circ, values["juros_c_redutora_acum"],
-                             "Impacto de juros CIRC", "BF")
+                             "Impacto de juros CIRC",
+                             source_column_for(detail, "juros_c_redutora_acum", "BF"))
 
             if values.get("transf_contas_redutoras", 0) > 0:
                 ledger_entry(entries, contract, movement, "R12", juros_circ, juros_nc, values["transf_contas_redutoras"],
-                             "Transferencia de juros N-CIRC para CIRC", "BD")
+                             "Transferencia de juros N-CIRC para CIRC",
+                             source_column_for(detail, "transf_contas_redutoras", "BD"))
 
     return entries
 
@@ -480,7 +664,7 @@ def extract(input_path: Path) -> dict[str, Any]:
         "ledgerSummary": summarize_ledger(ledger_entries),
         "audit": build_audit(contracts, details),
         "rules": [
-            {"column": "AL", "name": "Transferencia de principal circulante"},
+            {"column": "AL", "name": "Transferencia de principal N-CIRC para CIRC"},
             {"column": "AM", "name": "Juros NC x Resultado"},
             {"column": "AN", "name": "Juros NC x Redutora NC"},
             {"column": "AO", "name": "Ajuste NC"},
@@ -489,7 +673,7 @@ def extract(input_path: Path) -> dict[str, Any]:
             {"column": "AV/AW", "name": "Amortizacao principal e juros"},
             {"column": "AX", "name": "Ajuste C"},
             {"column": "BA", "name": "Ajuste no pagamento"},
-            {"column": "BB/BC", "name": "Regra especial de ajuste NC/C"},
+            {"column": "BB/BC", "name": "Marcadores textuais e D/C para revisao"},
             {"column": "BD", "name": "Transferencia entre redutoras"},
             {"column": "BE/BF", "name": "Reducao de juros redutores"},
         ],

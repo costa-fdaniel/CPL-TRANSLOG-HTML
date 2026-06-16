@@ -43,6 +43,12 @@ http://127.0.0.1:8765
 
 Os arquivos em `data/raw/` e `data/processed/` ficam fora do Git por conterem dados financeiros sensiveis.
 
+## Atencao as formulas do XLSB
+
+O extrator usa a planilha como fonte dos calculos: ele le os valores calculados das formulas do `.xlsb` e transforma esses resultados em JSON/lancamentos. Por isso, antes de gerar o JSON, a planilha deve estar salva/recalculada no Excel.
+
+As colunas de lancamento sao identificadas pelo cabecalho de cada aba. Quando uma aba desloca o layout padrao, como aconteceu na aba `108`, o extrator usa a coluna detectada e registra o alerta na auditoria. Marcadores textuais como `D/C`, `D-Passivo, C-Resultado` e observacoes em `BB/BC` tambem ficam guardados para revisao.
+
 ## Fluxo de lancamento
 
 1. Use a aba `Transacoes` para simular eventos novos sobre um contrato.
