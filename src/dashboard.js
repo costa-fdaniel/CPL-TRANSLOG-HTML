@@ -1088,7 +1088,7 @@ function renderLedgerCharts() {
     (entry) => entry.month,
     (entry) => entry.amount,
   ))
-    .map(([date, amount]) => ({ date, label: date.slice(5), amount }))
+    .map(([date, amount]) => ({ date, label: monthLabel(date), amount }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
   const maxMonth = Math.max(...byMonth.map((item) => item.amount), 1);
@@ -1106,7 +1106,10 @@ function renderLedgerCharts() {
     state.filteredLedger,
     (entry) => entry.rule,
     (entry) => entry.amount,
-  ));
+  )).map((item) => ({
+    ...item,
+    meta: state.filteredLedger.find((entry) => entry.rule === item.label)?.description || "",
+  }));
   renderRankChart(els.ledgerRuleChart, byRule);
 }
 

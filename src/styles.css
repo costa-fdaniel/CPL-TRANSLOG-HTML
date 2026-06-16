@@ -336,8 +336,13 @@ button {
   padding: 10px 12px 12px;
 }
 
+.ledger-month-panel,
+.ledger-rule-panel {
+  min-height: 260px;
+}
+
 .ledger-month-panel .compact-chart {
-  height: 150px;
+  height: 170px;
   overflow: hidden;
   padding-top: 0;
 }
@@ -349,6 +354,9 @@ button {
 
 .ledger-rule-panel .rank-chart {
   gap: 7px;
+  max-height: 180px;
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .ledger-rule-panel .rank-row {
@@ -400,6 +408,17 @@ button {
   color: var(--ink);
   font-size: 14px;
   font-weight: 700;
+}
+
+.panel-heading {
+  display: grid;
+  gap: 3px;
+}
+
+.panel-subtitle {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .panel-body {
