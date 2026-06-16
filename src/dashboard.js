@@ -547,12 +547,19 @@ function populateLedgerControls() {
 }
 
 function populateTransactionControls() {
-  const contracts = [...state.data.contracts].sort((a, b) => a.id - b.id);
+  const contracts = [...(state.filteredContracts.length ? state.filteredContracts : adjustedContracts())].sort((a, b) => a.id - b.id);
   els.transactionContractSelect.innerHTML = contracts.map((contract) => (
     `<option value="${contract.id}">${contract.id} - ${escapeHtml(contract.contractNumber)} (${escapeHtml(contract.entity)})</option>`
   )).join("");
   if (state.selectedId && contracts.some((contract) => contract.id === state.selectedId)) {
     els.transactionContractSelect.value = String(state.selectedId);
+  } else if (contracts.length) {
+    state.selectedId = contracts[0].id;
+    els.transactionContractSelect.value = String(state.selectedId);
+    state.selectedInstallmentKeys.clear();
+  } else {
+    state.selectedId = null;
+    state.selectedInstallmentKeys.clear();
   }
   if (!els.transactionDateInput.value) {
     els.transactionDateInput.value = new Date().toISOString().slice(0, 10);
@@ -583,10 +590,11 @@ function applyFilters() {
   if (!state.filteredContracts.some((contract) => contract.id === state.selectedId)) {
     state.selectedId = state.filteredContracts[0]?.id ?? null;
     state.selectedInstallmentKeys.clear();
-    syncTransactionContractToSelected();
-    state.transactionDraftEntries = simulateTransaction();
   }
 
+  populateTransactionControls();
+  syncTransactionContractToSelected();
+  state.transactionDraftEntries = simulateTransaction();
   applyLedgerFilters();
   render();
 }
