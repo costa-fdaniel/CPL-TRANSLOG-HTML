@@ -36,7 +36,6 @@ const els = {
   kpis: document.querySelector("#kpis"),
   panelYearFilter: document.querySelector("#panelYearFilter"),
   panelContractFilter: document.querySelector("#panelContractFilter"),
-  panelMetricFilter: document.querySelector("#panelMetricFilter"),
   panelSummary: document.querySelector("#panelSummary"),
   monthlyChart: document.querySelector("#monthlyChart"),
   debtSplitChart: document.querySelector("#debtSplitChart"),
@@ -224,7 +223,6 @@ function panelFilterValues() {
   return {
     year: els.panelYearFilter?.value || "all",
     contractId: els.panelContractFilter?.value || "all",
-    metric: els.panelMetricFilter?.value || "debt",
   };
 }
 
@@ -790,25 +788,17 @@ function renderDebtSplit() {
 }
 
 function renderTopContractsChart() {
-  const metric = panelFilterValues().metric;
-  const valueGetter = {
-    debt: (contract) => contract.balances.finalDebt,
-    interest: (contract) => contract.balances.interestTotal,
-    pending: (contract) => contractInstallmentStats(contract).pendingAfterSelection,
-    flow: (contract) => sum(panelLedgerEntries().filter((entry) => entry.contractId === contract.id), (entry) => entry.amount),
-  }[metric] || ((contract) => contract.balances.finalDebt);
-  const valueFormatter = metric === "pending" ? (value) => `${value} parc.` : (value) => fmtMoney(value);
   const items = panelContracts()
     .map((contract) => ({
       id: contract.id,
       label: `${contract.id} - ${contract.contractNumber}`,
-      value: valueGetter(contract),
+      value: contract.balances.finalDebt,
       meta: `${contract.entity} / ${contract.status}`,
     }))
     .filter((item) => item.value > 0)
     .sort((a, b) => b.value - a.value)
     .slice(0, 10);
-  renderRankChart(els.topContractsChart, items, { clickable: true, valueFormatter });
+  renderRankChart(els.topContractsChart, items, { clickable: true });
 }
 
 function renderInterestChart() {
@@ -2061,7 +2051,6 @@ els.entityFilter.addEventListener("change", applyFilters);
 [
   els.panelYearFilter,
   els.panelContractFilter,
-  els.panelMetricFilter,
 ].forEach((control) => {
   control.addEventListener("change", renderPanelCharts);
 });

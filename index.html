@@ -19,17 +19,6 @@
               <span>Carregar JSON</span>
               <input id="fileInput" type="file" accept="application/json,.json">
             </label>
-            <input id="searchInput" class="search" type="search" placeholder="Buscar contrato, ID, tipo ou comentario">
-            <select id="statusFilter" class="select" aria-label="Status">
-              <option value="all">Todos os status</option>
-              <option value="ativo">Ativos</option>
-              <option value="quitado">Quitados</option>
-            </select>
-            <select id="entityFilter" class="select" aria-label="Empresa">
-              <option value="all">SAGA + TLOG</option>
-              <option value="SAGA">SAGA</option>
-              <option value="TLOG">TLOG</option>
-            </select>
           </div>
         </div>
       </header>
@@ -45,6 +34,29 @@
           <button class="tab-button" data-tab="audit">Auditoria</button>
         </nav>
 
+        <section class="global-filter-bar">
+          <label>
+            <span>Busca geral</span>
+            <input id="searchInput" class="search" type="search" placeholder="Contrato, ID, tipo ou comentario">
+          </label>
+          <label>
+            <span>Status</span>
+            <select id="statusFilter" class="select" aria-label="Status">
+              <option value="all">Todos os status</option>
+              <option value="ativo">Ativos</option>
+              <option value="quitado">Quitados</option>
+            </select>
+          </label>
+          <label>
+            <span>Empresa</span>
+            <select id="entityFilter" class="select" aria-label="Empresa">
+              <option value="all">SAGA + TLOG</option>
+              <option value="SAGA">SAGA</option>
+              <option value="TLOG">TLOG</option>
+            </select>
+          </label>
+        </section>
+
         <section id="panelTab" class="tab-panel active">
           <section class="panel-filter-bar">
             <label>
@@ -57,15 +69,6 @@
               <span>Contrato no painel</span>
               <select id="panelContractFilter" class="select">
                 <option value="all">Todos os contratos</option>
-              </select>
-            </label>
-            <label>
-              <span>Visao principal</span>
-              <select id="panelMetricFilter" class="select">
-                <option value="debt">Saldo / divida</option>
-                <option value="interest">Juros</option>
-                <option value="pending">Parcelas pendentes</option>
-                <option value="flow">Fluxo de lancamentos</option>
               </select>
             </label>
           </section>
