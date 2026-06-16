@@ -4,7 +4,11 @@ const state = {
   filteredLedger: [],
   selectedId: null,
   selectedLedgerIds: new Set(),
+  manualEntries: [],
+  transactionDraftEntries: [],
 };
+
+const MANUAL_STORAGE_KEY = "cpl-translog-html-manual-entries";
 
 const currency = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -51,6 +55,26 @@ const els = {
   ledgerRuleChart: document.querySelector("#ledgerRuleChart"),
   ledgerTable: document.querySelector("#ledgerTable tbody"),
   ledgerCount: document.querySelector("#ledgerCount"),
+  transactionContractSelect: document.querySelector("#transactionContractSelect"),
+  transactionActionSelect: document.querySelector("#transactionActionSelect"),
+  transactionDateInput: document.querySelector("#transactionDateInput"),
+  transactionAmountInput: document.querySelector("#transactionAmountInput"),
+  transactionInstallmentsInput: document.querySelector("#transactionInstallmentsInput"),
+  transactionSettledSelect: document.querySelector("#transactionSettledSelect"),
+  transactionScopeSelect: document.querySelector("#transactionScopeSelect"),
+  transactionDirectionSelect: document.querySelector("#transactionDirectionSelect"),
+  transactionDebitInput: document.querySelector("#transactionDebitInput"),
+  transactionCreditInput: document.querySelector("#transactionCreditInput"),
+  transactionNoteInput: document.querySelector("#transactionNoteInput"),
+  simulateTransactionButton: document.querySelector("#simulateTransactionButton"),
+  addTransactionButton: document.querySelector("#addTransactionButton"),
+  transactionExplanation: document.querySelector("#transactionExplanation"),
+  transactionContractSnapshot: document.querySelector("#transactionContractSnapshot"),
+  transactionSimulationTable: document.querySelector("#transactionSimulationTable tbody"),
+  transactionSimulationCount: document.querySelector("#transactionSimulationCount"),
+  manualTransactionsTable: document.querySelector("#manualTransactionsTable tbody"),
+  exportManualLayerButton: document.querySelector("#exportManualLayerButton"),
+  clearManualLayerButton: document.querySelector("#clearManualLayerButton"),
 };
 
 function escapeHtml(value) {
@@ -80,6 +104,44 @@ function removeAccents(value) {
   return String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
+function parseAmount(value) {
+  const raw = String(value ?? "").trim().replace(/\s/g, "");
+  if (!raw) return 0;
+  const lastComma = raw.lastIndexOf(",");
+  const lastDot = raw.lastIndexOf(".");
+  let normalized = raw;
+  if (lastComma >= 0 && lastDot >= 0) {
+    normalized = lastComma > lastDot
+      ? raw.replace(/\./g, "").replace(",", ".")
+      : raw.replace(/,/g, "");
+  } else if (lastComma >= 0) {
+    normalized = raw.replace(/\./g, "").replace(",", ".");
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(raw)) {
+    normalized = raw.replace(/\./g, "");
+  }
+  const number = Number(normalized);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function addMonths(dateString, months) {
+  const [year, month, day] = dateString.split("-").map(Number);
+  const date = new Date(year, month - 1 + months, day);
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function accountIsReady(account) {
+  const text = String(account ?? "").trim();
+  if (!text || ["AAA", "Quitado"].includes(text)) return false;
+  return /^\d+$/.test(text);
+}
+
+function resultAccountFor(contract) {
+  return String(contract?.type ?? "").toLowerCase().includes("leasing") ? "4773" : "375";
+}
+
 function byFinalDebt(a, b) {
   return b.balances.finalDebt - a.balances.finalDebt;
 }
@@ -102,6 +164,28 @@ function entriesFromGroup(group) {
     .sort((a, b) => b.value - a.value);
 }
 
+function allLedgerEntries() {
+  return [...(state.data?.ledgerEntries || []), ...state.manualEntries];
+}
+
+function saveManualEntries() {
+  localStorage.setItem(MANUAL_STORAGE_KEY, JSON.stringify(state.manualEntries));
+}
+
+function loadManualEntries() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(MANUAL_STORAGE_KEY) || "[]");
+    state.manualEntries = Array.isArray(stored) ? stored : [];
+  } catch {
+    state.manualEntries = [];
+  }
+}
+
+function selectedTransactionContract() {
+  const id = Number(els.transactionContractSelect.value);
+  return state.data?.contracts.find((contract) => contract.id === id) || null;
+}
+
 async function loadDefaultData() {
   try {
     const response = await fetch("data/processed/dashboard.json", { cache: "no-store" });
@@ -119,17 +203,26 @@ function setData(data, sourceLabel) {
   state.data = data;
   state.selectedId = data.contracts?.[0]?.id ?? null;
   state.selectedLedgerIds.clear();
+  state.transactionDraftEntries = [];
+  loadManualEntries();
   els.status.textContent = `${sourceLabel} | ${data.totals.contracts} contratos | gerado em ${data.metadata.generatedAt}`;
   populateLedgerControls();
+  populateTransactionControls();
   applyFilters();
   renderRules();
+  renderTransactionPanel();
 }
 
 function populateLedgerControls() {
-  const years = [...new Set(state.data.ledgerEntries.map((entry) => entry.year))].sort();
+  const previousYear = els.ledgerYearFilter.value;
+  const previousContract = els.ledgerContractFilter.value;
+  const previousRule = els.ledgerRuleFilter.value;
+  const years = [...new Set(allLedgerEntries().map((entry) => entry.year))].sort();
   els.ledgerYearFilter.innerHTML = `<option value="all">Todos os anos</option>`
     + years.map((year) => `<option value="${year}">${year}</option>`).join("");
-  if (years.includes(2025)) {
+  if (years.map(String).includes(previousYear)) {
+    els.ledgerYearFilter.value = previousYear;
+  } else if (years.includes(2025)) {
     els.ledgerYearFilter.value = "2025";
   }
 
@@ -138,10 +231,29 @@ function populateLedgerControls() {
     + contracts.map((contract) => (
       `<option value="${contract.id}">${contract.id} - ${escapeHtml(contract.contractNumber)}</option>`
     )).join("");
+  if ([...els.ledgerContractFilter.options].some((option) => option.value === previousContract)) {
+    els.ledgerContractFilter.value = previousContract;
+  }
 
-  const rules = [...new Set(state.data.ledgerEntries.map((entry) => entry.rule))].sort();
+  const rules = [...new Set(allLedgerEntries().map((entry) => entry.rule))].sort();
   els.ledgerRuleFilter.innerHTML = `<option value="all">Todas as regras</option>`
     + rules.map((rule) => `<option value="${rule}">${rule}</option>`).join("");
+  if ([...els.ledgerRuleFilter.options].some((option) => option.value === previousRule)) {
+    els.ledgerRuleFilter.value = previousRule;
+  }
+}
+
+function populateTransactionControls() {
+  const contracts = [...state.data.contracts].sort((a, b) => a.id - b.id);
+  els.transactionContractSelect.innerHTML = contracts.map((contract) => (
+    `<option value="${contract.id}">${contract.id} - ${escapeHtml(contract.contractNumber)} (${escapeHtml(contract.entity)})</option>`
+  )).join("");
+  if (state.selectedId && contracts.some((contract) => contract.id === state.selectedId)) {
+    els.transactionContractSelect.value = String(state.selectedId);
+  }
+  if (!els.transactionDateInput.value) {
+    els.transactionDateInput.value = new Date().toISOString().slice(0, 10);
+  }
 }
 
 function applyFilters() {
@@ -185,7 +297,7 @@ function applyLedgerFilters() {
   const dateTo = els.ledgerDateTo.value;
   const term = els.ledgerSearch.value.trim().toLowerCase();
 
-  state.filteredLedger = state.data.ledgerEntries
+  state.filteredLedger = allLedgerEntries()
     .filter((entry) => status === "all" || entry.status === status)
     .filter((entry) => entity === "all" || entry.entity === entity)
     .filter((entry) => year === "all" || String(entry.year) === year)
@@ -220,6 +332,10 @@ function renderEmpty() {
   els.rules.innerHTML = "";
   els.ledgerTable.innerHTML = "";
   els.ledgerKpis.innerHTML = "";
+  els.transactionSimulationTable.innerHTML = "";
+  els.manualTransactionsTable.innerHTML = "";
+  els.transactionExplanation.innerHTML = "";
+  els.transactionContractSnapshot.innerHTML = "";
 }
 
 function render() {
@@ -229,6 +345,7 @@ function render() {
   renderDetail();
   renderAudit();
   renderLedgerPanel();
+  renderTransactionPanel();
 }
 
 function renderKpis() {
@@ -240,6 +357,7 @@ function renderKpis() {
     ["Divida final", fmtMoney(sum(contracts, (contract) => contract.balances.finalDebt))],
     ["Juros no ano", fmtMoney(sum(contracts, (contract) => contract.balances.interestTotal))],
     ["Lancamentos filtrados", state.filteredLedger.length],
+    ["Transacoes HTML", state.manualEntries.length],
   ];
   els.kpis.innerHTML = items.map(([label, value]) => `
     <section class="kpi">
@@ -368,7 +486,7 @@ function renderDetail() {
   }
   const detail = selectedDetail();
   const movementCount = detail?.movements?.length || 0;
-  const ledgerCount = state.data.ledgerEntries.filter((entry) => entry.contractId === contract.id).length;
+  const ledgerCount = allLedgerEntries().filter((entry) => entry.contractId === contract.id).length;
   const flags = contract.flags.length
     ? contract.flags.map((flag) => `<span class="pill pill-warning">${escapeHtml(flag)}</span>`).join(" ")
     : "-";
@@ -468,19 +586,7 @@ function renderLedgerTable() {
   els.ledgerCount.textContent = `${rows.length} de ${state.filteredLedger.length} linhas exibidas`;
   els.toggleVisibleLedger.checked = rows.length > 0 && rows.every((entry) => state.selectedLedgerIds.has(entry.id));
 
-  els.ledgerTable.innerHTML = rows.map((entry) => `
-    <tr>
-      <td><input class="ledger-check" type="checkbox" data-id="${escapeHtml(entry.id)}" ${state.selectedLedgerIds.has(entry.id) ? "checked" : ""}></td>
-      <td>${fmtDateBr(entry.date)}</td>
-      <td>${entry.contractId} - ${escapeHtml(entry.contractNumber)}</td>
-      <td>${escapeHtml(entry.rule)} <span class="source-column">${escapeHtml(entry.sourceColumn)}</span></td>
-      <td>${escapeHtml(entry.debit)}</td>
-      <td>${escapeHtml(entry.credit)}</td>
-      <td>${fmtMoney(entry.amount, true)}</td>
-      <td><span class="pill ${entry.reviewStatus === "pronto" ? "pill-active" : "pill-warning"}">${escapeHtml(entry.reviewStatus)}</span></td>
-      <td>${escapeHtml(entry.description)}</td>
-    </tr>
-  `).join("");
+  els.ledgerTable.innerHTML = rows.map((entry) => ledgerRowCells(entry, true)).join("");
 
   els.ledgerTable.querySelectorAll(".ledger-check").forEach((checkbox) => {
     checkbox.addEventListener("change", () => {
@@ -492,6 +598,239 @@ function renderLedgerTable() {
       renderLedgerKpis();
     });
   });
+}
+
+function scopeTargets(contract, scope, action) {
+  const balances = contract.balances;
+  const interestWeights = {
+    current: Math.max(0, balances.interestCurrent || 0),
+    non_current: Math.max(0, balances.interestNonCurrent || 0),
+  };
+  const principalWeights = {
+    current: Math.max(0, balances.currentFinal || 0),
+    non_current: Math.max(0, balances.nonCurrentFinal || 0),
+  };
+  const weights = action === "interest_adjustment" ? interestWeights : principalWeights;
+  const totalWeight = weights.current + weights.non_current;
+  const base = [
+    {
+      scope: "current",
+      label: "Circulante",
+      principalAccount: contract.accounts.circ,
+      interestAccount: contract.accounts.jurosCirc,
+      weight: totalWeight ? weights.current / totalWeight : 0.5,
+    },
+    {
+      scope: "non_current",
+      label: "Nao circulante",
+      principalAccount: contract.accounts.naoCirc,
+      interestAccount: contract.accounts.jurosNaoCirc,
+      weight: totalWeight ? weights.non_current / totalWeight : 0.5,
+    },
+  ];
+  if (scope === "both") return base;
+  return base.filter((target) => target.scope === scope);
+}
+
+function makeManualEntry({ contract, date, debit, credit, amount, rule, description, issues = [] }) {
+  const issueList = [...issues];
+  if (!accountIsReady(debit)) issueList.push(`Debito pendente: ${debit || "vazio"}`);
+  if (!accountIsReady(credit)) issueList.push(`Credito pendente: ${credit || "vazio"}`);
+  if (contract.status === "quitado") issueList.push("Contrato ja marcado como quitado na base");
+
+  return {
+    id: `manual-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    origin: "manual",
+    contractId: contract.id,
+    contractNumber: contract.contractNumber,
+    entity: contract.entity,
+    contractType: contract.type,
+    status: contract.status,
+    parcel: "",
+    date,
+    year: Number(date.slice(0, 4)),
+    month: date.slice(0, 7),
+    debit,
+    credit,
+    amount,
+    historyCode: "",
+    description,
+    rule,
+    sourceColumn: "HTML",
+    sourceRow: "",
+    reviewStatus: issueList.length ? "revisar" : "pronto",
+    issues: issueList,
+  };
+}
+
+function transactionDescription(action, contract, target, note, settled) {
+  const noteText = note ? ` - ${note}` : "";
+  const settledText = settled === "S" ? " com quitacao informada" : "";
+  const base = {
+    payment: `Pagamento/amortizacao ${target.label}${settledText}`,
+    interest_adjustment: `Ajuste de juros ${target.label}`,
+    liability_adjustment: `Ajuste do passivo ${target.label}`,
+    settlement: `Quitacao ${target.label}`,
+    custom: "Lancamento manual",
+  }[action];
+  return `${base} ref. contrato ${contract.contractNumber} aba (${contract.id})${noteText}`;
+}
+
+function actionExplanation(action) {
+  return {
+    payment: "Registra pagamento ou amortizacao contra a conta do passivo selecionada e a conta 000. Use N parcelas para dividir o valor em vencimentos mensais.",
+    interest_adjustment: "Gera ajuste de juros contra a conta de resultado do contrato. Leasing usa 4773; os demais usam 375. A direcao define se aumenta ou reduz o juros/redutora.",
+    liability_adjustment: "Gera ajuste no passivo circulante ou nao circulante. Usa a conta ponte AAA e por isso fica marcado como revisar antes da importacao.",
+    settlement: "Registra baixa/quitacao do contrato no alvo escolhido. Se o valor ficar vazio, usa o saldo final do alvo quando existir.",
+    custom: "Permite informar manualmente debito e credito. Use quando a operacao nao couber nas regras padrao.",
+  }[action] || "";
+}
+
+function simulateTransaction() {
+  const contract = selectedTransactionContract();
+  if (!contract) return [];
+
+  const action = els.transactionActionSelect.value;
+  const date = els.transactionDateInput.value;
+  const amountInput = parseAmount(els.transactionAmountInput.value);
+  const installments = Math.max(1, Number(els.transactionInstallmentsInput.value || 1));
+  const scope = els.transactionScopeSelect.value;
+  const direction = els.transactionDirectionSelect.value;
+  const settled = els.transactionSettledSelect.value;
+  const note = els.transactionNoteInput.value.trim();
+  const resultAccount = resultAccountFor(contract);
+  const targets = action === "custom"
+    ? [{ scope: "custom", label: "Manual", weight: 1, principalAccount: "", interestAccount: "" }]
+    : scopeTargets(contract, scope, action);
+
+  if (!date || (!amountInput && action !== "settlement")) {
+    return [];
+  }
+
+  const entries = [];
+  for (let index = 0; index < installments; index += 1) {
+    const entryDate = addMonths(date, index);
+    targets.forEach((target) => {
+      let targetTotal = amountInput;
+      if (targetTotal && targets.length > 1) {
+        targetTotal *= target.weight;
+      }
+      if (!targetTotal && action === "settlement") {
+        targetTotal = target.scope === "current"
+          ? Math.max(0, contract.balances.currentFinal || 0)
+          : Math.max(0, contract.balances.nonCurrentFinal || 0);
+      }
+      const targetAmount = targetTotal / installments;
+      if (!targetAmount) return;
+
+      let debit = "";
+      let credit = "";
+      let rule = "";
+      const description = transactionDescription(action, contract, target, note, settled);
+      const issues = [];
+
+      if (settled === "S") issues.push("Quitou = S; conferir se a baixa liquida o saldo do contrato");
+
+      if (action === "payment" || action === "settlement") {
+        debit = target.principalAccount;
+        credit = "000";
+        rule = action === "settlement" ? "TX-QUITACAO" : "TX-PGTO";
+      } else if (action === "interest_adjustment") {
+        if (direction === "increase") {
+          debit = resultAccount;
+          credit = target.interestAccount;
+          rule = "TX-JUROS+";
+        } else {
+          debit = target.interestAccount;
+          credit = resultAccount;
+          rule = "TX-JUROS-";
+        }
+      } else if (action === "liability_adjustment") {
+        if (direction === "increase") {
+          debit = "AAA";
+          credit = target.principalAccount;
+          rule = "TX-PASSIVO+";
+        } else {
+          debit = target.principalAccount;
+          credit = "AAA";
+          rule = "TX-PASSIVO-";
+        }
+      } else {
+        debit = els.transactionDebitInput.value.trim();
+        credit = els.transactionCreditInput.value.trim();
+        rule = "TX-MANUAL";
+      }
+
+      entries.push(makeManualEntry({
+        contract,
+        date: entryDate,
+        debit,
+        credit,
+        amount: targetAmount,
+        rule,
+        description,
+        issues,
+      }));
+    });
+  }
+  return entries;
+}
+
+function renderTransactionPanel() {
+  if (!state.data) return;
+  const contract = selectedTransactionContract();
+  const action = els.transactionActionSelect.value;
+  els.transactionExplanation.innerHTML = `<p>${escapeHtml(actionExplanation(action))}</p>`;
+
+  if (contract) {
+    els.transactionContractSnapshot.innerHTML = `
+      <div><span>Contrato</span><strong>${escapeHtml(contract.contractNumber)}</strong></div>
+      <div><span>Status</span><strong>${escapeHtml(contract.status)}</strong></div>
+      <div><span>Tipo</span><strong>${escapeHtml(contract.type || "-")}</strong></div>
+      <div><span>Resultado</span><strong>${resultAccountFor(contract)}</strong></div>
+      <div><span>Circ.</span><strong>${escapeHtml(contract.accounts.circ || "-")}</strong></div>
+      <div><span>N-Circ.</span><strong>${escapeHtml(contract.accounts.naoCirc || "-")}</strong></div>
+      <div><span>Red. C</span><strong>${escapeHtml(contract.accounts.jurosCirc || "-")}</strong></div>
+      <div><span>Red. NC</span><strong>${escapeHtml(contract.accounts.jurosNaoCirc || "-")}</strong></div>
+    `;
+  }
+
+  renderTransactionSimulation();
+  renderManualTransactions();
+}
+
+function renderTransactionSimulation() {
+  const rows = state.transactionDraftEntries;
+  els.transactionSimulationCount.textContent = `${rows.length} lancamento(s) simulados`;
+  els.transactionSimulationTable.innerHTML = rows.map((entry) => ledgerRowCells(entry, false)).join("")
+    || `<tr><td colspan="8" class="empty-cell">Preencha os dados e clique em Simular.</td></tr>`;
+}
+
+function renderManualTransactions() {
+  els.manualTransactionsTable.innerHTML = state.manualEntries
+    .slice()
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .map((entry) => ledgerRowCells(entry, false))
+    .join("") || `<tr><td colspan="8" class="empty-cell">Nenhuma transacao adicionada nesta camada local.</td></tr>`;
+}
+
+function ledgerRowCells(entry, withCheck = true) {
+  const checkbox = withCheck
+    ? `<td><input class="ledger-check" type="checkbox" data-id="${escapeHtml(entry.id)}" ${state.selectedLedgerIds.has(entry.id) ? "checked" : ""}></td>`
+    : "";
+  return `
+    <tr class="${entry.origin === "manual" ? "manual-row" : ""}">
+      ${checkbox}
+      <td>${fmtDateBr(entry.date)}</td>
+      <td>${entry.contractId} - ${escapeHtml(entry.contractNumber)}</td>
+      <td>${escapeHtml(entry.rule)} <span class="source-column">${escapeHtml(entry.sourceColumn)}</span></td>
+      <td>${escapeHtml(entry.debit)}</td>
+      <td>${escapeHtml(entry.credit)}</td>
+      <td>${fmtMoney(entry.amount, true)}</td>
+      <td><span class="pill ${entry.reviewStatus === "pronto" ? "pill-active" : "pill-warning"}">${escapeHtml(entry.reviewStatus)}</span></td>
+      <td>${escapeHtml(entry.description)}</td>
+    </tr>
+  `;
 }
 
 function selectedLedgerForExport() {
@@ -540,6 +879,54 @@ function exportLedgerCsv() {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function addDraftTransactionToLedger() {
+  if (!state.transactionDraftEntries.length) {
+    state.transactionDraftEntries = simulateTransaction();
+  }
+  if (!state.transactionDraftEntries.length) {
+    renderTransactionPanel();
+    return;
+  }
+  const entries = state.transactionDraftEntries.map((entry) => ({
+    ...entry,
+    id: `manual-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  }));
+  entries.forEach((entry) => state.selectedLedgerIds.add(entry.id));
+  state.manualEntries.push(...entries);
+  saveManualEntries();
+  state.transactionDraftEntries = [];
+  els.ledgerReadyFilter.value = "all";
+  populateLedgerControls();
+  applyLedgerFilters();
+  render();
+}
+
+function exportManualLayer() {
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    count: state.manualEntries.length,
+    entries: state.manualEntries,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "cpl-translog-transacoes-html.json";
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function clearManualLayer() {
+  state.manualEntries = [];
+  state.selectedLedgerIds.clear();
+  saveManualEntries();
+  populateLedgerControls();
+  applyLedgerFilters();
+  render();
 }
 
 function switchTab(tabName) {
@@ -604,5 +991,47 @@ els.toggleVisibleLedger.addEventListener("change", () => {
 });
 
 els.exportLedgerButton.addEventListener("click", exportLedgerCsv);
+
+[
+  els.transactionContractSelect,
+  els.transactionActionSelect,
+  els.transactionSettledSelect,
+  els.transactionScopeSelect,
+  els.transactionDirectionSelect,
+].forEach((control) => {
+  control.addEventListener("change", () => {
+    if (control === els.transactionContractSelect) {
+      state.selectedId = Number(control.value);
+      renderContractsTable();
+      renderDetail();
+      renderAudit();
+    }
+    state.transactionDraftEntries = simulateTransaction();
+    renderTransactionPanel();
+  });
+});
+
+[
+  els.transactionDateInput,
+  els.transactionAmountInput,
+  els.transactionInstallmentsInput,
+  els.transactionDebitInput,
+  els.transactionCreditInput,
+  els.transactionNoteInput,
+].forEach((control) => {
+  control.addEventListener("input", () => {
+    state.transactionDraftEntries = simulateTransaction();
+    renderTransactionPanel();
+  });
+});
+
+els.simulateTransactionButton.addEventListener("click", () => {
+  state.transactionDraftEntries = simulateTransaction();
+  renderTransactionPanel();
+});
+
+els.addTransactionButton.addEventListener("click", addDraftTransactionToLedger);
+els.exportManualLayerButton.addEventListener("click", exportManualLayer);
+els.clearManualLayerButton.addEventListener("click", clearManualLayer);
 
 loadDefaultData();

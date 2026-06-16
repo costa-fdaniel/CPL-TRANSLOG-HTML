@@ -39,6 +39,7 @@
 
         <nav class="tabs" aria-label="Areas do dashboard">
           <button class="tab-button active" data-tab="panel">Painel</button>
+          <button class="tab-button" data-tab="transactions">Transacoes</button>
           <button class="tab-button" data-tab="ledger">Lancamentos</button>
           <button class="tab-button" data-tab="contracts">Contratos</button>
           <button class="tab-button" data-tab="audit">Auditoria</button>
@@ -82,6 +83,145 @@
               <div class="panel-body">
                 <div id="typeChart" class="rank-chart"></div>
               </div>
+            </div>
+          </section>
+        </section>
+
+        <section id="transactionsTab" class="tab-panel">
+          <section class="grid-two transaction-layout">
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Nova transacao</div>
+                <div class="action-row">
+                  <button id="simulateTransactionButton" class="button">Simular</button>
+                  <button id="addTransactionButton" class="button primary">Adicionar a esteira</button>
+                </div>
+              </div>
+              <div class="panel-body">
+                <div class="transaction-form">
+                  <label>
+                    <span>Contrato</span>
+                    <select id="transactionContractSelect" class="select"></select>
+                  </label>
+                  <label>
+                    <span>Acao</span>
+                    <select id="transactionActionSelect" class="select">
+                      <option value="payment">Pagamento / amortizacao</option>
+                      <option value="interest_adjustment">Ajuste de juros</option>
+                      <option value="liability_adjustment">Ajuste do passivo</option>
+                      <option value="settlement">Quitacao</option>
+                      <option value="custom">Lancamento manual</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Data</span>
+                    <input id="transactionDateInput" class="select" type="date">
+                  </label>
+                  <label>
+                    <span>Valor total</span>
+                    <input id="transactionAmountInput" class="select" type="number" step="0.01" min="0" placeholder="0,00">
+                  </label>
+                  <label>
+                    <span>N parcelas</span>
+                    <input id="transactionInstallmentsInput" class="select" type="number" min="1" value="1">
+                  </label>
+                  <label>
+                    <span>Quitou?</span>
+                    <select id="transactionSettledSelect" class="select">
+                      <option value="N">Nao</option>
+                      <option value="S">Sim</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Alvo</span>
+                    <select id="transactionScopeSelect" class="select">
+                      <option value="current">Circulante</option>
+                      <option value="non_current">Nao circulante</option>
+                      <option value="both">Circulante + Nao circulante</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Direcao</span>
+                    <select id="transactionDirectionSelect" class="select">
+                      <option value="increase">Aumenta saldo/juros</option>
+                      <option value="decrease">Reduz saldo/juros</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Debito manual</span>
+                    <input id="transactionDebitInput" class="select" type="text" placeholder="Opcional">
+                  </label>
+                  <label>
+                    <span>Credito manual</span>
+                    <input id="transactionCreditInput" class="select" type="text" placeholder="Opcional">
+                  </label>
+                  <label class="wide-field">
+                    <span>Observacao</span>
+                    <textarea id="transactionNoteInput" class="select" rows="3" placeholder="Detalhe que deve aparecer no historico"></textarea>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-title">Explicacao da acao</div>
+              </div>
+              <div class="panel-body">
+                <div id="transactionExplanation" class="explanation-box"></div>
+                <div id="transactionContractSnapshot" class="snapshot-grid"></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Simulacao</div>
+              <div id="transactionSimulationCount" class="panel-note"></div>
+            </div>
+            <div class="table-wrap">
+              <table id="transactionSimulationTable">
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Contrato</th>
+                    <th>Regra</th>
+                    <th>Debito</th>
+                    <th>Credito</th>
+                    <th>Valor</th>
+                    <th>Situacao</th>
+                    <th>Historico</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Transacoes adicionadas no HTML</div>
+              <div class="action-row">
+                <button id="exportManualLayerButton" class="button secondary">Exportar camada JSON</button>
+                <button id="clearManualLayerButton" class="button secondary">Limpar camada local</button>
+              </div>
+            </div>
+            <div class="table-wrap ledger-wrap">
+              <table id="manualTransactionsTable">
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Contrato</th>
+                    <th>Regra</th>
+                    <th>Debito</th>
+                    <th>Credito</th>
+                    <th>Valor</th>
+                    <th>Situacao</th>
+                    <th>Historico</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
             </div>
           </section>
         </section>

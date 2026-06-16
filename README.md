@@ -10,6 +10,7 @@ Dashboard HTML para acompanhamento dos contratos financeiros da TRANSLOG/SAGA/TL
 - auditoria de regras e alertas de atualizacao.
 - esteira de lancamentos com filtros por ano, periodo, contrato, regra, empresa e situacao;
 - exportacao CSV dos lancamentos selecionados ou filtrados.
+- simulacao de transacoes no HTML, com acoes de pagamento, ajuste de juros, ajuste de passivo, quitacao e lancamento manual.
 
 ## Como atualizar os dados
 
@@ -44,14 +45,16 @@ Os arquivos em `data/raw/` e `data/processed/` ficam fora do Git por conterem da
 
 ## Fluxo de lancamento
 
-1. Use a aba `Lancamentos`.
-2. Filtre por ano, periodo, contrato, regra ou situacao.
-3. Confira os lancamentos `prontos` e os itens `revisar`.
-4. Marque os lancamentos desejados ou deixe sem selecao para exportar tudo que esta filtrado.
-5. Clique em `Exportar CSV`.
+1. Use a aba `Transacoes` para simular eventos novos sobre um contrato.
+2. Escolha contrato, acao, data, valor, numero de parcelas, alvo, direcao e se quitou.
+3. Confira a explicacao e a simulacao dos debitos/creditos.
+4. Clique em `Adicionar a esteira`.
+5. Use a aba `Lancamentos` para filtrar, selecionar e exportar o CSV.
 
 O dashboard gera uma previa com as colunas esperadas pelo arquivo de importacao contabil:
 
 ```text
 Parcelamento;Data;Cod. Conta Debito;Cod. Conta Credito;Valor;Cod. Historico;Complemento Historico;Inicia Lote;Codigo Matriz/Filial;Centro de Custo Debito;Centro de Custo Credito
 ```
+
+As transacoes feitas no HTML ficam salvas no navegador como camada local. Elas entram na previa e na exportacao, mas nao alteram a planilha `.xlsb` nem o JSON gerado pelo extrator. Use `Exportar camada JSON` para salvar um backup dessas transacoes manuais.
