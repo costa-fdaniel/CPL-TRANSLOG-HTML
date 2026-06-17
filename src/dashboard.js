@@ -10,9 +10,11 @@ const state = {
   batchImportRows: [],
   panelControlsInitialized: false,
   pendingSystemState: null,
+  contractOverrides: {},
 };
 
 const MANUAL_STORAGE_KEY = "cpl-translog-html-manual-entries";
+const LOCAL_STATE_STORAGE_KEY = "cpl-translog-html-local-state";
 const SYSTEM_STATE_SCHEMA = "cpl-translog-system-state";
 
 const currency = new Intl.NumberFormat("pt-BR", {
@@ -49,7 +51,25 @@ const els = {
   pendingChart: document.querySelector("#pendingChart"),
   contractsTable: document.querySelector("#contractsTable tbody"),
   detail: document.querySelector("#contractDetail"),
+  contractEditorStatus: document.querySelector("#contractEditorStatus"),
+  contractStatusOverride: document.querySelector("#contractStatusOverride"),
+  contractTypeOverride: document.querySelector("#contractTypeOverride"),
+  contractCommentsOverride: document.querySelector("#contractCommentsOverride"),
+  accountCircOverride: document.querySelector("#accountCircOverride"),
+  accountJurosCircOverride: document.querySelector("#accountJurosCircOverride"),
+  accountNaoCircOverride: document.querySelector("#accountNaoCircOverride"),
+  accountJurosNaoCircOverride: document.querySelector("#accountJurosNaoCircOverride"),
+  balanceCurrentOverride: document.querySelector("#balanceCurrentOverride"),
+  balanceNonCurrentOverride: document.querySelector("#balanceNonCurrentOverride"),
+  interestCurrentOverride: document.querySelector("#interestCurrentOverride"),
+  interestNonCurrentOverride: document.querySelector("#interestNonCurrentOverride"),
+  saveContractOverrideButton: document.querySelector("#saveContractOverrideButton"),
+  clearContractOverrideButton: document.querySelector("#clearContractOverrideButton"),
   audit: document.querySelector("#auditList"),
+  operationalSummary: document.querySelector("#operationalSummary"),
+  validationList: document.querySelector("#validationList"),
+  reconciliationTable: document.querySelector("#reconciliationTable tbody"),
+  operationTrailTable: document.querySelector("#operationTrailTable tbody"),
   rules: document.querySelector("#rulesTable tbody"),
   ledgerKpis: document.querySelector("#ledgerKpis"),
   ledgerYearFilter: document.querySelector("#ledgerYearFilter"),
@@ -260,6 +280,46 @@ function resultAccountFor(contract) {
   return String(contract?.type ?? "").toLowerCase().includes("leasing") ? "4773" : "375";
 }
 
+function contractOverrideFor(contractOrId) {
+  const id = typeof contractOrId === "object" ? contractOrId?.id : contractOrId;
+  return state.contractOverrides[String(id)] || null;
+}
+
+function numberOrOriginal(value, original) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : original;
+}
+
+function applyContractOverride(contract) {
+  const override = contractOverrideFor(contract);
+  if (!override) return contract;
+  const accounts = {
+    ...contract.accounts,
+    ...(override.accounts || {}),
+  };
+  const balances = {
+    ...contract.balances,
+    ...(override.balances || {}),
+  };
+  balances.currentFinal = numberOrOriginal(balances.currentFinal, contract.balances.currentFinal);
+  balances.nonCurrentFinal = numberOrOriginal(balances.nonCurrentFinal, contract.balances.nonCurrentFinal);
+  balances.interestCurrent = numberOrOriginal(balances.interestCurrent, contract.balances.interestCurrent);
+  balances.interestNonCurrent = numberOrOriginal(balances.interestNonCurrent, contract.balances.interestNonCurrent);
+  balances.finalDebt = balances.currentFinal + balances.nonCurrentFinal;
+  balances.interestTotal = balances.interestCurrent + balances.interestNonCurrent;
+  return {
+    ...contract,
+    ...override.fields,
+    accounts,
+    balances,
+    override,
+    flags: [
+      ...(contract.flags || []),
+      ...(override.updatedAt ? ["cadastro_html"] : []),
+    ],
+  };
+}
+
 function byFinalDebt(a, b) {
   return b.balances.finalDebt - a.balances.finalDebt;
 }
@@ -359,18 +419,19 @@ function manualImpactFor(contract) {
 
 function adjustedContract(contract) {
   if (!contract) return null;
-  const impact = manualImpactFor(contract);
-  const currentFinal = Math.max(0, (contract.balances.currentFinal || 0) + impact.currentPrincipal);
-  const nonCurrentFinal = Math.max(0, (contract.balances.nonCurrentFinal || 0) + impact.nonCurrentPrincipal);
-  const interestCurrent = Math.max(0, (contract.balances.interestCurrent || 0) + impact.currentInterest);
-  const interestNonCurrent = Math.max(0, (contract.balances.interestNonCurrent || 0) + impact.nonCurrentInterest);
+  const baseContract = applyContractOverride(contract);
+  const impact = manualImpactFor(baseContract);
+  const currentFinal = Math.max(0, (baseContract.balances.currentFinal || 0) + impact.currentPrincipal);
+  const nonCurrentFinal = Math.max(0, (baseContract.balances.nonCurrentFinal || 0) + impact.nonCurrentPrincipal);
+  const interestCurrent = Math.max(0, (baseContract.balances.interestCurrent || 0) + impact.currentInterest);
+  const interestNonCurrent = Math.max(0, (baseContract.balances.interestNonCurrent || 0) + impact.nonCurrentInterest);
   return {
-    ...contract,
-    status: contract.status === "quitado" || (currentFinal + nonCurrentFinal <= 0.005 && contractInstallments(contract).every((item) => item.status !== "pendente"))
+    ...baseContract,
+    status: baseContract.status === "quitado" || (currentFinal + nonCurrentFinal <= 0.005 && contractInstallments(baseContract).every((item) => item.status !== "pendente"))
       ? "quitado"
-      : contract.status,
+      : baseContract.status,
     balances: {
-      ...contract.balances,
+      ...baseContract.balances,
       currentFinal,
       nonCurrentFinal,
       finalDebt: currentFinal + nonCurrentFinal,
@@ -386,16 +447,34 @@ function adjustedContracts() {
   return (state.data?.contracts || []).map((contract) => adjustedContract(contract));
 }
 
+function localStatePayload() {
+  return {
+    entries: state.manualEntries,
+    contractOverrides: state.contractOverrides,
+  };
+}
+
 function saveManualEntries() {
+  localStorage.setItem(LOCAL_STATE_STORAGE_KEY, JSON.stringify(localStatePayload()));
   localStorage.setItem(MANUAL_STORAGE_KEY, JSON.stringify(state.manualEntries));
 }
 
 function loadManualEntries() {
   try {
-    const stored = JSON.parse(localStorage.getItem(MANUAL_STORAGE_KEY) || "[]");
-    state.manualEntries = Array.isArray(stored) ? stored : [];
+    const storedState = JSON.parse(localStorage.getItem(LOCAL_STATE_STORAGE_KEY) || "null");
+    if (storedState && typeof storedState === "object") {
+      state.manualEntries = Array.isArray(storedState.entries) ? storedState.entries : [];
+      state.contractOverrides = storedState.contractOverrides && typeof storedState.contractOverrides === "object"
+        ? storedState.contractOverrides
+        : {};
+      return;
+    }
+    const storedEntries = JSON.parse(localStorage.getItem(MANUAL_STORAGE_KEY) || "[]");
+    state.manualEntries = Array.isArray(storedEntries) ? storedEntries : [];
+    state.contractOverrides = {};
   } catch {
     state.manualEntries = [];
+    state.contractOverrides = {};
   }
 }
 
@@ -517,6 +596,212 @@ function contractInstallmentStats(contract) {
     pendingAfterSelection,
     selectedAmount: sum(installments.filter((item) => item.status === "selecionada"), (item) => item.total),
     pendingAmount: sum(installments.filter((item) => item.status === "pendente" || item.status === "selecionada"), (item) => item.total),
+  };
+}
+
+function entryBalanceEffect(entry, contract) {
+  const amount = Number(entry.amount || 0);
+  const effect = {
+    currentPrincipal: 0,
+    nonCurrentPrincipal: 0,
+    currentInterest: 0,
+    nonCurrentInterest: 0,
+    result: 0,
+    cash: 0,
+  };
+  if (!contract || !amount) return effect;
+
+  const accountMap = [
+    ["currentPrincipal", contract.accounts.circ],
+    ["nonCurrentPrincipal", contract.accounts.naoCirc],
+    ["currentInterest", contract.accounts.jurosCirc],
+    ["nonCurrentInterest", contract.accounts.jurosNaoCirc],
+  ];
+  accountMap.forEach(([key, account]) => {
+    if (entry.credit === account) effect[key] += amount;
+    if (entry.debit === account) effect[key] -= amount;
+  });
+
+  const resultAccount = resultAccountFor(contract);
+  if (entry.debit === resultAccount) effect.result += amount;
+  if (entry.credit === resultAccount) effect.result -= amount;
+  if (entry.credit === "000") effect.cash -= amount;
+  if (entry.debit === "000") effect.cash += amount;
+  return effect;
+}
+
+function addFinding(findings, severity, contractId, title, detail, entry = null) {
+  findings.push({
+    severity,
+    contractId: contractId || "",
+    title,
+    detail,
+    entryId: entry?.id || "",
+    rule: entry?.rule || "",
+    amount: entry?.amount || 0,
+  });
+}
+
+function validateEntryAgainstRule(entry, contract, findings) {
+  const rule = String(entry.rule || "");
+  const amount = Number(entry.amount || 0);
+  if (!contract) {
+    addFinding(findings, "critical", entry.contractId, "Contrato ausente", "Lancamento sem contrato correspondente na base carregada.", entry);
+    return;
+  }
+  if (!entry.date || !/^\d{4}-\d{2}-\d{2}$/.test(entry.date)) {
+    addFinding(findings, "critical", entry.contractId, "Data invalida", "Lancamento sem data ISO valida para exportacao.", entry);
+  }
+  if (!Number.isFinite(amount) || amount <= 0.005) {
+    addFinding(findings, "critical", entry.contractId, "Valor invalido", "Lancamento sem valor positivo relevante.", entry);
+  }
+  if (!accountIsReady(entry.debit) || !accountIsReady(entry.credit)) {
+    addFinding(findings, "warning", entry.contractId, "Conta pendente", `Debito ${entry.debit || "-"} / credito ${entry.credit || "-"}.`, entry);
+  }
+  if (entry.debit && entry.credit && entry.debit === entry.credit) {
+    addFinding(findings, "critical", entry.contractId, "Debito igual ao credito", "Lancamento sem efeito contabil liquido.", entry);
+  }
+  if (contract.status === "quitado" && entry.origin === "manual" && !rule.includes("ESTORNO")) {
+    addFinding(findings, "warning", entry.contractId, "Contrato quitado com movimento HTML", "Conferir se o contrato deve ser reaberto ou se o movimento e somente estorno.", entry);
+  }
+  if (entry.reviewStatus !== "pronto") {
+    addFinding(findings, "warning", entry.contractId, "Lancamento em revisao", entry.issues?.join(" ") || "Marcado para revisao.", entry);
+  }
+
+  const resultAccount = resultAccountFor(contract);
+  const isLiabilityTransfer = rule.includes("TRANSF-PASSIVO-NC-C") || rule === "R4T";
+  const isInterestTransfer = rule.includes("TRANSF-JUROS-NC-C") || rule === "R12";
+  const isInterestReversal = rule.includes("ESTORNO-JUROS-DRE") || rule === "R2E" || rule === "R5E";
+  const isInterestComplement = rule.includes("COMP-JUROS-DRE") || rule === "R2" || rule === "R5";
+  if (isLiabilityTransfer && (entry.debit !== contract.accounts.naoCirc || entry.credit !== contract.accounts.circ)) {
+    addFinding(findings, "critical", entry.contractId, "Transferencia de passivo fora do padrao", "Esperado debito N-CIRC e credito CIRC.", entry);
+  }
+  if (isInterestTransfer && (entry.debit !== contract.accounts.jurosNaoCirc || entry.credit !== contract.accounts.jurosCirc)) {
+    addFinding(findings, "critical", entry.contractId, "Transferencia de juros fora do padrao", "Esperado debito juros N-CIRC e credito juros CIRC.", entry);
+  }
+  if (isInterestReversal && entry.credit !== resultAccount) {
+    addFinding(findings, "critical", entry.contractId, "Estorno DRE sem credito em resultado", "Estorno de juros deve creditar resultado financeiro.", entry);
+  }
+  if (isInterestComplement && entry.debit !== resultAccount) {
+    addFinding(findings, "critical", entry.contractId, "Complemento DRE sem debito em resultado", "Complemento de juros deve debitar resultado financeiro.", entry);
+  }
+  if ((rule.includes("PGTO") || rule.includes("QUIT")) && entry.credit !== "000" && entry.origin === "manual") {
+    addFinding(findings, "warning", entry.contractId, "Pagamento sem credito 000", "Baixas operacionais devem sair contra a conta 000 no modelo atual.", entry);
+  }
+}
+
+function buildOperationalModel() {
+  if (!state.data) {
+    return {
+      summary: {},
+      findings: [],
+      accountRows: [],
+      trailRows: [],
+      contractRows: [],
+    };
+  }
+
+  const contracts = adjustedContracts();
+  const contractMap = new Map(contracts.map((contract) => [contract.id, contract]));
+  const entries = allLedgerEntries();
+  const manualEntries = state.manualEntries;
+  const findings = [];
+  const accountMap = {};
+  const contractRows = contracts.map((contract) => {
+    const stats = contractInstallmentStats(contract);
+    const manual = manualEntries.filter((entry) => entry.contractId === contract.id);
+    return {
+      contract,
+      pending: stats.pendingAfterSelection,
+      queued: stats.queued,
+      manualEntries: manual.length,
+      reviewEntries: manual.filter((entry) => entry.reviewStatus !== "pronto").length,
+      exportedEntries: manual.filter((entry) => entry.operationStatus === "exportado").length,
+      impact: contract.systemImpact || {},
+    };
+  });
+
+  entries.forEach((entry) => {
+    const contract = contractMap.get(entry.contractId);
+    validateEntryAgainstRule(entry, contract, findings);
+    const amount = Number(entry.amount || 0);
+    [entry.debit, entry.credit].forEach((account) => {
+      if (!account) return;
+      if (!accountMap[account]) accountMap[account] = { account, debit: 0, credit: 0 };
+    });
+    if (entry.debit) accountMap[entry.debit].debit += amount;
+    if (entry.credit) accountMap[entry.credit].credit += amount;
+  });
+
+  const paymentKeys = {};
+  manualEntries.forEach((entry) => {
+    if (!entry.installmentKey || entry.installmentAdjustment === "reversal") return;
+    paymentKeys[entry.installmentKey] = paymentKeys[entry.installmentKey] || [];
+    paymentKeys[entry.installmentKey].push(entry);
+  });
+  Object.values(paymentKeys)
+    .filter((items) => items.length > 2)
+    .forEach((items) => {
+      addFinding(
+        findings,
+        "warning",
+        items[0].contractId,
+        "Parcela com multiplos movimentos HTML",
+        `${items.length} lancamentos vinculados a mesma parcela; conferir se houve duplicidade ou composicao principal/juros.`,
+        items[0],
+      );
+    });
+
+  contractRows.forEach((row) => {
+    const finalDebt = row.contract.balances.finalDebt;
+    if (finalDebt <= 0.005 && row.pending > 0) {
+      addFinding(findings, "warning", row.contract.id, "Saldo zerado com parcelas pendentes", "Contrato sem divida final, mas com parcelas ainda classificadas como pendentes.");
+    }
+    if (row.reviewEntries > 0) {
+      addFinding(findings, "warning", row.contract.id, "Contrato com HTML em revisao", `${row.reviewEntries} lancamento(s) HTML exigem conferencia.`);
+    }
+  });
+
+  const accountRows = Object.values(accountMap)
+    .map((row) => ({
+      ...row,
+      balance: row.debit - row.credit,
+      volume: row.debit + row.credit,
+    }))
+    .sort((a, b) => b.volume - a.volume);
+
+  const trailRows = [...manualEntries]
+    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
+    .slice(0, 80);
+
+  const severityCounts = findings.reduce((acc, finding) => {
+    acc[finding.severity] = (acc[finding.severity] || 0) + 1;
+    return acc;
+  }, {});
+  const exportedEntries = manualEntries.filter((entry) => entry.operationStatus === "exportado").length;
+  const draftEntries = manualEntries.filter((entry) => entry.operationStatus !== "exportado").length;
+  return {
+    summary: {
+      contracts: contracts.length,
+      contractOverrides: Object.keys(state.contractOverrides).length,
+      entries: entries.length,
+      manualEntries: manualEntries.length,
+      exportedEntries,
+      draftEntries,
+      critical: severityCounts.critical || 0,
+      warnings: severityCounts.warning || 0,
+      readyManual: manualEntries.filter((entry) => entry.reviewStatus === "pronto").length,
+      reviewManual: manualEntries.filter((entry) => entry.reviewStatus !== "pronto").length,
+      totalDebit: sum(accountRows, (row) => row.debit),
+      totalCredit: sum(accountRows, (row) => row.credit),
+    },
+    findings: findings.sort((a, b) => {
+      const order = { critical: 0, warning: 1, info: 2 };
+      return (order[a.severity] ?? 9) - (order[b.severity] ?? 9);
+    }),
+    accountRows,
+    trailRows,
+    contractRows,
   };
 }
 
@@ -724,7 +1009,12 @@ function renderEmpty() {
   els.pendingChart.innerHTML = "";
   els.contractsTable.innerHTML = "";
   els.detail.innerHTML = `<div class="empty-state">Selecione ou carregue uma base.</div>`;
+  els.contractEditorStatus.innerHTML = "";
   els.audit.innerHTML = "";
+  els.operationalSummary.innerHTML = "";
+  els.validationList.innerHTML = "";
+  els.reconciliationTable.innerHTML = "";
+  els.operationTrailTable.innerHTML = "";
   els.rules.innerHTML = "";
   els.ledgerTable.innerHTML = "";
   els.ledgerKpis.innerHTML = "";
@@ -743,6 +1033,7 @@ function render() {
   renderPanelCharts();
   renderContractsTable();
   renderDetail();
+  renderContractEditor();
   renderAudit();
   renderLedgerPanel();
   renderTransactionPanel();
@@ -985,6 +1276,7 @@ function selectPanelContract(contractId) {
   renderPanelCharts();
   renderContractsTable();
   renderDetail();
+  renderContractEditor();
   renderAudit();
   renderTransactionPanel();
 }
@@ -1011,6 +1303,7 @@ function renderContractsTable() {
       state.transactionDraftEntries = simulateTransaction();
       renderContractsTable();
       renderDetail();
+      renderContractEditor();
       renderAudit();
       renderTransactionPanel();
     });
@@ -1121,7 +1414,164 @@ function renderDetail() {
   `;
 }
 
+function setEditorDisabled(disabled) {
+  [
+    els.contractStatusOverride,
+    els.contractTypeOverride,
+    els.contractCommentsOverride,
+    els.accountCircOverride,
+    els.accountJurosCircOverride,
+    els.accountNaoCircOverride,
+    els.accountJurosNaoCircOverride,
+    els.balanceCurrentOverride,
+    els.balanceNonCurrentOverride,
+    els.interestCurrentOverride,
+    els.interestNonCurrentOverride,
+    els.saveContractOverrideButton,
+    els.clearContractOverrideButton,
+  ].forEach((control) => {
+    if (control) control.disabled = disabled;
+  });
+}
+
+function fillEditorInput(input, value) {
+  if (input) input.value = value ?? "";
+}
+
+function renderContractEditor() {
+  const original = state.data?.contracts?.find((item) => item.id === state.selectedId);
+  const contract = original ? applyContractOverride(original) : null;
+  if (!contract) {
+    setEditorDisabled(true);
+    els.contractEditorStatus.textContent = "Selecione um contrato para editar o cadastro operacional.";
+    return;
+  }
+  setEditorDisabled(false);
+  fillEditorInput(els.contractStatusOverride, contract.status || "ativo");
+  fillEditorInput(els.contractTypeOverride, contract.type || "");
+  fillEditorInput(els.contractCommentsOverride, contract.comments || "");
+  fillEditorInput(els.accountCircOverride, contract.accounts.circ || "");
+  fillEditorInput(els.accountJurosCircOverride, contract.accounts.jurosCirc || "");
+  fillEditorInput(els.accountNaoCircOverride, contract.accounts.naoCirc || "");
+  fillEditorInput(els.accountJurosNaoCircOverride, contract.accounts.jurosNaoCirc || "");
+  fillEditorInput(els.balanceCurrentOverride, Number(contract.balances.currentFinal || 0).toFixed(2));
+  fillEditorInput(els.balanceNonCurrentOverride, Number(contract.balances.nonCurrentFinal || 0).toFixed(2));
+  fillEditorInput(els.interestCurrentOverride, Number(contract.balances.interestCurrent || 0).toFixed(2));
+  fillEditorInput(els.interestNonCurrentOverride, Number(contract.balances.interestNonCurrent || 0).toFixed(2));
+  els.contractEditorStatus.textContent = contract.override?.updatedAt
+    ? `Cadastro local ativo desde ${fmtDateBr(contract.override.updatedAt.slice(0, 10))}.`
+    : "Sem ajuste local: os campos refletem a base importada.";
+}
+
+function inputMoneyValue(input, fallback) {
+  if (!String(input?.value ?? "").trim()) return fallback;
+  const value = parseAmount(input?.value);
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function saveContractOverride() {
+  const original = state.data?.contracts?.find((contract) => contract.id === state.selectedId);
+  if (!original) return;
+  const override = {
+    updatedAt: new Date().toISOString(),
+    fields: {
+      status: els.contractStatusOverride.value || original.status,
+      type: els.contractTypeOverride.value.trim(),
+      comments: els.contractCommentsOverride.value.trim(),
+    },
+    accounts: {
+      circ: els.accountCircOverride.value.trim(),
+      jurosCirc: els.accountJurosCircOverride.value.trim(),
+      naoCirc: els.accountNaoCircOverride.value.trim(),
+      jurosNaoCirc: els.accountJurosNaoCircOverride.value.trim(),
+    },
+    balances: {
+      currentFinal: inputMoneyValue(els.balanceCurrentOverride, original.balances.currentFinal),
+      nonCurrentFinal: inputMoneyValue(els.balanceNonCurrentOverride, original.balances.nonCurrentFinal),
+      interestCurrent: inputMoneyValue(els.interestCurrentOverride, original.balances.interestCurrent),
+      interestNonCurrent: inputMoneyValue(els.interestNonCurrentOverride, original.balances.interestNonCurrent),
+    },
+  };
+  state.contractOverrides[String(original.id)] = override;
+  saveManualEntries();
+  populatePanelControls();
+  populateLedgerControls();
+  applyFilters();
+}
+
+function clearContractOverride() {
+  if (!state.selectedId) return;
+  delete state.contractOverrides[String(state.selectedId)];
+  saveManualEntries();
+  populatePanelControls();
+  populateLedgerControls();
+  applyFilters();
+}
+
+function renderOperationalControl() {
+  const model = buildOperationalModel();
+  const summary = model.summary;
+  const delta = Math.abs((summary.totalDebit || 0) - (summary.totalCredit || 0));
+  const healthLabel = summary.critical > 0
+    ? "Bloqueio"
+    : summary.warnings > 0
+      ? "Revisar"
+      : "Operacional";
+  const items = [
+    ["Saude do motor", healthLabel, summary.critical > 0 ? "danger" : summary.warnings > 0 ? "warning" : "good"],
+    ["Criticos", summary.critical || 0, summary.critical > 0 ? "danger" : ""],
+    ["Avisos", summary.warnings || 0, summary.warnings > 0 ? "warning" : ""],
+    ["Cadastros HTML", summary.contractOverrides || 0, ""],
+    ["Transacoes HTML", summary.manualEntries || 0, ""],
+    ["Nao exportadas", summary.draftEntries || 0, summary.draftEntries > 0 ? "warning" : ""],
+    ["Exportadas", summary.exportedEntries || 0, "good"],
+    ["D/C diferenca", fmtMoney(delta, true), delta > 0.005 ? "danger" : "good"],
+  ];
+  els.operationalSummary.innerHTML = items.map(([label, value, tone]) => `
+    <section class="control-card ${tone ? `control-${tone}` : ""}">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+    </section>
+  `).join("");
+
+  const findings = model.findings.slice(0, 80);
+  els.validationList.innerHTML = findings.map((finding) => `
+    <div class="validation-item ${escapeHtml(finding.severity)}">
+      <div>
+        <strong>${escapeHtml(finding.title)}</strong>
+        <span>${escapeHtml(finding.detail)}</span>
+      </div>
+      <em>${escapeHtml(finding.contractId || "-")}${finding.rule ? ` / ${escapeHtml(finding.rule)}` : ""}</em>
+    </div>
+  `).join("") || `<div class="empty-state">Nenhuma pendencia operacional encontrada.</div>`;
+
+  els.reconciliationTable.innerHTML = model.accountRows.slice(0, 40).map((row) => `
+    <tr>
+      <td>${escapeHtml(row.account)}</td>
+      <td>${fmtMoney(row.debit, true)}</td>
+      <td>${fmtMoney(row.credit, true)}</td>
+      <td>${fmtMoney(row.balance, true)}</td>
+    </tr>
+  `).join("") || `<tr><td colspan="4" class="empty-cell">Sem contas movimentadas.</td></tr>`;
+
+  els.operationTrailTable.innerHTML = model.trailRows.map((entry) => `
+    <tr>
+      <td>${escapeHtml(entry.operationId || "-")}</td>
+      <td>${escapeHtml(entry.createdAt ? fmtDateBr(entry.createdAt.slice(0, 10)) : "-")}</td>
+      <td>${entry.contractId} - ${escapeHtml(entry.contractNumber)}</td>
+      <td>${escapeHtml(entry.rule)}</td>
+      <td>
+        <span class="pill ${entry.operationStatus === "exportado" ? "pill-active" : entry.reviewStatus === "pronto" ? "pill-settled" : "pill-warning"}">
+          ${escapeHtml(entry.operationStatus || entry.reviewStatus)}
+        </span>
+      </td>
+      <td>${fmtMoney(entry.amount, true)}</td>
+    </tr>
+  `).join("") || `<tr><td colspan="6" class="empty-cell">Nenhuma operacao HTML criada.</td></tr>`;
+}
+
 function renderAudit() {
+  renderOperationalControl();
   const selectedOnly = state.data.audit.filter((item) => item.contractId === state.selectedId);
   const items = selectedOnly.length ? selectedOnly : state.data.audit.slice(0, 50);
   els.audit.innerHTML = items.map((item) => `
@@ -1277,6 +1727,30 @@ function scopeTargets(contract, scope, action) {
   return base.filter((target) => target.scope === scope);
 }
 
+function draftRuleIssues({ contract, debit, credit, amount, rule }) {
+  const issues = [];
+  const resultAccount = resultAccountFor(contract);
+  if (!Number.isFinite(Number(amount)) || Number(amount) <= 0.005) {
+    issues.push("Valor invalido ou zerado");
+  }
+  if (debit && credit && debit === credit) {
+    issues.push("Debito e credito iguais");
+  }
+  if (rule.includes("TRANSF-PASSIVO-NC-C") && (debit !== contract.accounts.naoCirc || credit !== contract.accounts.circ)) {
+    issues.push("Transf. Passivo NC/C deve debitar N-CIRC e creditar CIRC");
+  }
+  if (rule.includes("TRANSF-JUROS-NC-C") && (debit !== contract.accounts.jurosNaoCirc || credit !== contract.accounts.jurosCirc)) {
+    issues.push("Transf. Juros NC/C deve debitar juros N-CIRC e creditar juros CIRC");
+  }
+  if (rule.includes("ESTORNO-JUROS-DRE") && credit !== resultAccount) {
+    issues.push("Estorno DRE deve creditar resultado financeiro");
+  }
+  if (rule.includes("COMP-JUROS-DRE") && debit !== resultAccount) {
+    issues.push("Complemento DRE deve debitar resultado financeiro");
+  }
+  return issues;
+}
+
 function makeManualEntry({
   contract,
   date,
@@ -1291,6 +1765,7 @@ function makeManualEntry({
   extra = {},
 }) {
   const issueList = [...issues];
+  issueList.push(...draftRuleIssues({ contract, debit, credit, amount, rule }));
   if (!accountIsReady(debit)) issueList.push(`Debito pendente: ${debit || "vazio"}`);
   if (!accountIsReady(credit)) issueList.push(`Credito pendente: ${credit || "vazio"}`);
   if (contract.status === "quitado") issueList.push("Contrato ja marcado como quitado na base");
@@ -1990,7 +2465,10 @@ function ledgerRowCells(entry, withCheck = true) {
       <td>${escapeHtml(entry.debit)}</td>
       <td>${escapeHtml(entry.credit)}</td>
       <td>${fmtMoney(entry.amount, true)}</td>
-      <td><span class="pill ${entry.reviewStatus === "pronto" ? "pill-active" : "pill-warning"}">${escapeHtml(entry.reviewStatus)}</span></td>
+      <td>
+        <span class="pill ${entry.reviewStatus === "pronto" ? "pill-active" : "pill-warning"}">${escapeHtml(entry.reviewStatus)}</span>
+        ${entry.origin === "manual" ? `<span class="op-status">${escapeHtml(entry.operationStatus || "rascunho")}</span>` : ""}
+      </td>
       <td>${escapeHtml(entry.description)}</td>
     </tr>
   `;
@@ -2003,6 +2481,7 @@ function selectedLedgerForExport() {
 
 function exportLedgerCsv() {
   const entries = selectedLedgerForExport();
+  const exportBatchId = `exp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const header = [
     "Parcelamento",
     "Data",
@@ -2042,6 +2521,22 @@ function exportLedgerCsv() {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+
+  const exportedManualIds = new Set(entries
+    .filter((entry) => entry.origin === "manual")
+    .map((entry) => entry.id));
+  if (exportedManualIds.size) {
+    const exportedAt = new Date().toISOString();
+    state.manualEntries = state.manualEntries.map((entry) => (
+      exportedManualIds.has(entry.id)
+        ? { ...entry, operationStatus: "exportado", exportedAt, exportBatchId }
+        : entry
+    ));
+    saveManualEntries();
+    populatePanelControls();
+    populateLedgerControls();
+    applyFilters();
+  }
 }
 
 function addDraftTransactionToLedger() {
@@ -2087,9 +2582,10 @@ function exportManualLayer() {
 function buildSystemStatePayload() {
   const contracts = adjustedContracts();
   const entries = state.manualEntries;
+  const operationalModel = buildOperationalModel();
   return {
     schema: SYSTEM_STATE_SCHEMA,
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     source: {
       generatedAt: state.data?.metadata?.generatedAt || "",
@@ -2101,8 +2597,10 @@ function buildSystemStatePayload() {
       ready: entries.filter((entry) => entry.reviewStatus === "pronto").length,
       review: entries.filter((entry) => entry.reviewStatus !== "pronto").length,
       operations: new Set(entries.map((entry) => entry.operationId).filter(Boolean)).size,
+      contractOverrides: Object.keys(state.contractOverrides).length,
     },
     entries,
+    contractOverrides: state.contractOverrides,
     contractBalances: contracts.map((contract) => ({
       id: contract.id,
       contractNumber: contract.contractNumber,
@@ -2128,11 +2626,17 @@ function buildSystemStatePayload() {
       reviewStatus: entry.reviewStatus,
       description: entry.description,
     })),
+    operationalControl: {
+      summary: operationalModel.summary,
+      findings: operationalModel.findings.slice(0, 200),
+      reconciliation: operationalModel.accountRows.slice(0, 100),
+    },
   };
 }
 
 function clearManualLayer() {
   state.manualEntries = [];
+  state.contractOverrides = {};
   state.selectedLedgerIds.clear();
   saveManualEntries();
   populatePanelControls();
@@ -2147,6 +2651,9 @@ function importSystemState(payload) {
     origin: entry.origin || "manual",
     operationStatus: entry.operationStatus || (entry.reviewStatus === "pronto" ? "pronto" : "revisar"),
   }));
+  state.contractOverrides = payload?.contractOverrides && typeof payload.contractOverrides === "object"
+    ? payload.contractOverrides
+    : {};
   state.selectedLedgerIds.clear();
   state.selectedInstallmentKeys.clear();
   state.transactionDraftEntries = [];
@@ -2377,6 +2884,8 @@ els.toggleVisibleLedger.addEventListener("change", () => {
 });
 
 els.exportLedgerButton.addEventListener("click", exportLedgerCsv);
+els.saveContractOverrideButton.addEventListener("click", saveContractOverride);
+els.clearContractOverrideButton.addEventListener("click", clearContractOverride);
 
 [
   els.transactionContractSelect,
@@ -2391,6 +2900,7 @@ els.exportLedgerButton.addEventListener("click", exportLedgerCsv);
       state.selectedInstallmentKeys.clear();
       renderContractsTable();
       renderDetail();
+      renderContractEditor();
       renderAudit();
     } else if (control === els.transactionActionSelect) {
       state.selectedInstallmentKeys.clear();

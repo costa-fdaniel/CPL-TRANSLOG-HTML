@@ -498,9 +498,136 @@
               <div id="contractDetail" class="panel-body contract-detail-scroll"></div>
             </div>
           </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div class="panel-heading">
+                <div class="panel-title">Cadastro operacional do contrato</div>
+                <div class="panel-subtitle">Ajustes locais ficam no estado do sistema e substituem os campos da base importada.</div>
+              </div>
+              <div class="action-row">
+                <button id="saveContractOverrideButton" class="button primary">Salvar cadastro</button>
+                <button id="clearContractOverrideButton" class="button secondary">Limpar ajuste</button>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div id="contractEditorStatus" class="status-line"></div>
+              <div class="contract-editor-grid">
+                <label>
+                  <span>Status</span>
+                  <select id="contractStatusOverride" class="select">
+                    <option value="ativo">ativo</option>
+                    <option value="quitado">quitado</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Tipo</span>
+                  <input id="contractTypeOverride" class="select" type="text">
+                </label>
+                <label class="wide-field">
+                  <span>Comentario</span>
+                  <input id="contractCommentsOverride" class="select" type="text">
+                </label>
+                <label>
+                  <span>Conta CIRC</span>
+                  <input id="accountCircOverride" class="select" type="text">
+                </label>
+                <label>
+                  <span>Juros CIRC</span>
+                  <input id="accountJurosCircOverride" class="select" type="text">
+                </label>
+                <label>
+                  <span>Conta N-CIRC</span>
+                  <input id="accountNaoCircOverride" class="select" type="text">
+                </label>
+                <label>
+                  <span>Juros N-CIRC</span>
+                  <input id="accountJurosNaoCircOverride" class="select" type="text">
+                </label>
+                <label>
+                  <span>Saldo CIRC</span>
+                  <input id="balanceCurrentOverride" class="select" type="number" step="0.01">
+                </label>
+                <label>
+                  <span>Saldo N-CIRC</span>
+                  <input id="balanceNonCurrentOverride" class="select" type="number" step="0.01">
+                </label>
+                <label>
+                  <span>Juros CIRC</span>
+                  <input id="interestCurrentOverride" class="select" type="number" step="0.01">
+                </label>
+                <label>
+                  <span>Juros N-CIRC</span>
+                  <input id="interestNonCurrentOverride" class="select" type="number" step="0.01">
+                </label>
+              </div>
+            </div>
+          </section>
         </section>
 
         <section id="auditTab" class="tab-panel">
+          <section id="operationalSummary" class="control-grid"></section>
+
+          <section class="grid-two">
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-heading">
+                  <div class="panel-title">Validador operacional</div>
+                  <div class="panel-subtitle">Checks para substituir a planilha com trilha e controle.</div>
+                </div>
+              </div>
+              <div class="panel-body">
+                <div id="validationList" class="validation-list"></div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div class="panel-heading">
+                  <div class="panel-title">Reconciliacao contabil</div>
+                  <div class="panel-subtitle">Maiores contas movimentadas por debito e credito.</div>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table id="reconciliationTable">
+                  <thead>
+                    <tr>
+                      <th>Conta</th>
+                      <th>Debito</th>
+                      <th>Credito</th>
+                      <th>Saldo</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div class="panel-heading">
+                <div class="panel-title">Trilha operacional HTML</div>
+                <div class="panel-subtitle">Operacoes criadas, exportadas e ainda pendentes na camada local.</div>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table id="operationTrailTable">
+                <thead>
+                  <tr>
+                    <th>Operacao</th>
+                    <th>Data</th>
+                    <th>Contrato</th>
+                    <th>Regra</th>
+                    <th>Status</th>
+                    <th>Valor</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+
           <section class="grid-two">
             <div class="panel">
               <div class="panel-header">
