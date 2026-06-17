@@ -84,6 +84,10 @@ Tipos aceitos em `tipo`:
 - `manual`: usa `debito`, `credito` e `valor` informados no CSV.
 - `ajuste_juros`: gera ajuste de juros por `valor`, `alvo` e `direcao`.
 - `ajuste_passivo`: gera ajuste do passivo por `valor`, `alvo` e `direcao`.
+- `transf_passivo_nc_c`: debita passivo nao circulante e credita passivo circulante.
+- `transf_juros_nc_c`: debita juros nao circulante e credita juros circulante.
+- `estorno_juros_dre`: debita juros do passivo e credita resultado financeiro, usando `alvo` como `current`, `non_current` ou `both`.
+- `complemento_juros_dre`: debita resultado financeiro e credita juros do passivo, usando `alvo` como `current`, `non_current` ou `both`.
 
 O importador valida contrato, data, parcelas, valores e contas antes de adicionar na esteira. Linhas com erro ficam na previa e nao entram em `Adicionar validos`.
 

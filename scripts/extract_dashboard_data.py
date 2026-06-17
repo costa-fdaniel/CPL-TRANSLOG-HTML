@@ -521,6 +521,40 @@ def source_column_for(detail: dict[str, Any], key: str, fallback: str) -> str:
     return detail.get("movementColumns", {}).get(key, {}).get("letter", fallback)
 
 
+def source_columns_for(detail: dict[str, Any], columns: list[tuple[str, str]]) -> str:
+    result: list[str] = []
+    for key, fallback in columns:
+        letter = source_column_for(detail, key, fallback)
+        if letter not in result:
+            result.append(letter)
+    return "/".join(result)
+
+
+def is_relevant_amount(value: float | None) -> bool:
+    return value is not None and abs(value) >= 0.005
+
+
+def opposite_equal_amount(left: float, right: float) -> bool:
+    return is_relevant_amount(left) and is_relevant_amount(right) and left * right < 0 and abs(abs(left) - abs(right)) < 0.005
+
+
+def subtract_transfer_component(value: float, component: float) -> float:
+    if not is_relevant_amount(value) or component <= 0:
+        return value
+    residual = abs(value) - component
+    if residual < 0.005:
+        return 0.0
+    return math.copysign(residual, value)
+
+
+def movement_has_marker(movement: dict[str, Any], *tokens: str) -> bool:
+    marker_text = " ".join(movement.get("textMarkers", {}).values())
+    if not marker_text:
+        return False
+    normalized_text = normalize_label(marker_text)
+    return all(normalize_label(token) in normalized_text for token in tokens)
+
+
 def build_ledger_entries(contracts: list[dict[str, Any]], details: list[dict[str, Any]]) -> list[dict[str, Any]]:
     contracts_by_id = {contract["id"]: contract for contract in contracts}
     entries: list[dict[str, Any]] = []
@@ -541,31 +575,75 @@ def build_ledger_entries(contracts: list[dict[str, Any]], details: list[dict[str
 
         for movement in detail["movements"]:
             values = movement["values"]
+            ajuste_nc = float(values.get("ajuste_nc", 0) or 0)
+            ajuste_c = float(values.get("ajuste_c", 0) or 0)
+            residual_ajuste_nc = ajuste_nc
+            residual_ajuste_c = ajuste_c
+            has_paired_adjustment = opposite_equal_amount(ajuste_nc, ajuste_c)
+            has_interest_transfer_marker = movement_has_marker(movement, "TRANSF", "JUROS", "PASSIVO", "NC/C")
+            has_liability_transfer_marker = (
+                movement_has_marker(movement, "TRANSF", "PASSIVO", "NC/C")
+                and not has_interest_transfer_marker
+            )
+            interest_transfer_value = float(values.get("transf_contas_redutoras", 0) or 0)
 
             if values.get("transf_circ_principal", 0) < 0:
                 ledger_entry(entries, contract, movement, "R1", conta_nc, conta_circ, abs(values["transf_circ_principal"]),
                              "Transferencia de principal nao circulante para circulante",
                              source_column_for(detail, "transf_circ_principal", "AL"))
 
-            if values.get("juros_nc_resultado", 0) > 0:
-                ledger_entry(entries, contract, movement, "R2", result_account, juros_nc, values["juros_nc_resultado"],
-                             "Reconhecimento de juros N-CIRC x resultado",
-                             source_column_for(detail, "juros_nc_resultado", "AM"))
+            if is_relevant_amount(values.get("juros_nc_resultado")):
+                juros_nc_resultado = values["juros_nc_resultado"]
+                if juros_nc_resultado > 0:
+                    ledger_entry(entries, contract, movement, "R2", result_account, juros_nc, juros_nc_resultado,
+                                 "Complemento de juros DRE no passivo nao circulante",
+                                 source_column_for(detail, "juros_nc_resultado", "AM"))
+                else:
+                    ledger_entry(entries, contract, movement, "R2E", juros_nc, result_account, abs(juros_nc_resultado),
+                                 "Estorno de juros DRE no passivo nao circulante",
+                                 source_column_for(detail, "juros_nc_resultado", "AM"))
 
             if "juros_nc_redutora" in values:
                 ledger_entry(entries, contract, movement, "R3", juros_nc, conta_nc, values["juros_nc_redutora"],
                              "Provisionamento de juros N-CIRC",
                              source_column_for(detail, "juros_nc_redutora", "AN"))
 
-            if "ajuste_nc" in values:
-                ledger_entry(entries, contract, movement, "R4", "AAA", conta_nc, values["ajuste_nc"],
-                             "Ajuste do passivo nao circulante",
+            if is_relevant_amount(interest_transfer_value):
+                ledger_entry(entries, contract, movement, "R12", juros_nc, juros_circ, abs(interest_transfer_value),
+                             "Transferencia de juros do passivo nao circulante para circulante",
+                             source_column_for(detail, "transf_contas_redutoras", "BD"))
+                if is_relevant_amount(ajuste_nc) and is_relevant_amount(ajuste_c) and ajuste_nc * ajuste_c < 0:
+                    transfer_component = min(abs(ajuste_nc), abs(ajuste_c), abs(interest_transfer_value))
+                    residual_ajuste_nc = subtract_transfer_component(ajuste_nc, transfer_component)
+                    residual_ajuste_c = subtract_transfer_component(ajuste_c, transfer_component)
+            elif has_interest_transfer_marker and has_paired_adjustment:
+                ledger_entry(entries, contract, movement, "R12", juros_nc, juros_circ, abs(ajuste_nc),
+                             "Transferencia de juros do passivo nao circulante para circulante",
+                             source_columns_for(detail, [("ajuste_nc", "AO"), ("ajuste_c", "AX")]))
+                residual_ajuste_nc = 0.0
+                residual_ajuste_c = 0.0
+            elif (has_liability_transfer_marker or has_paired_adjustment) and has_paired_adjustment:
+                ledger_entry(entries, contract, movement, "R4T", conta_nc, conta_circ, abs(ajuste_nc),
+                             "Transferencia de passivo nao circulante para circulante",
+                             source_columns_for(detail, [("ajuste_nc", "AO"), ("ajuste_c", "AX")]))
+                residual_ajuste_nc = 0.0
+                residual_ajuste_c = 0.0
+
+            if is_relevant_amount(residual_ajuste_nc):
+                ledger_entry(entries, contract, movement, "R4", "AAA", conta_nc, residual_ajuste_nc,
+                             "Ajuste residual do passivo nao circulante",
                              source_column_for(detail, "ajuste_nc", "AO"))
 
-            if values.get("juros_c_resultado", 0) > 0:
-                ledger_entry(entries, contract, movement, "R5", result_account, juros_circ, values["juros_c_resultado"],
-                             "Reconhecimento de juros CIRC x resultado",
-                             source_column_for(detail, "juros_c_resultado", "AT"))
+            if is_relevant_amount(values.get("juros_c_resultado")):
+                juros_c_resultado = values["juros_c_resultado"]
+                if juros_c_resultado > 0:
+                    ledger_entry(entries, contract, movement, "R5", result_account, juros_circ, juros_c_resultado,
+                                 "Complemento de juros DRE no passivo circulante",
+                                 source_column_for(detail, "juros_c_resultado", "AT"))
+                else:
+                    ledger_entry(entries, contract, movement, "R5E", juros_circ, result_account, abs(juros_c_resultado),
+                                 "Estorno de juros DRE no passivo circulante",
+                                 source_column_for(detail, "juros_c_resultado", "AT"))
 
             if "juros_c_redutora" in values:
                 ledger_entry(entries, contract, movement, "R6", juros_circ, conta_circ, values["juros_c_redutora"],
@@ -582,9 +660,9 @@ def build_ledger_entries(contracts: list[dict[str, Any]], details: list[dict[str
                              "Amortizacao de juros",
                              source_column_for(detail, "amortizacao_juros", "AW"))
 
-            if "ajuste_c" in values:
-                ledger_entry(entries, contract, movement, "R8", "AAA", conta_circ, values["ajuste_c"],
-                             "Ajuste do passivo circulante",
+            if is_relevant_amount(residual_ajuste_c):
+                ledger_entry(entries, contract, movement, "R8", "AAA", conta_circ, residual_ajuste_c,
+                             "Ajuste residual do passivo circulante",
                              source_column_for(detail, "ajuste_c", "AX"))
 
             if "ajuste_pgto" in values:
@@ -610,11 +688,6 @@ def build_ledger_entries(contracts: list[dict[str, Any]], details: list[dict[str
                 ledger_entry(entries, contract, movement, "R11", result_account, juros_circ, values["juros_c_redutora_acum"],
                              "Impacto de juros CIRC",
                              source_column_for(detail, "juros_c_redutora_acum", "BF"))
-
-            if values.get("transf_contas_redutoras", 0) > 0:
-                ledger_entry(entries, contract, movement, "R12", juros_circ, juros_nc, values["transf_contas_redutoras"],
-                             "Transferencia de juros N-CIRC para CIRC",
-                             source_column_for(detail, "transf_contas_redutoras", "BD"))
 
     return entries
 
@@ -665,16 +738,17 @@ def extract(input_path: Path) -> dict[str, Any]:
         "audit": build_audit(contracts, details),
         "rules": [
             {"column": "AL", "name": "Transferencia de principal N-CIRC para CIRC"},
-            {"column": "AM", "name": "Juros NC x Resultado"},
+            {"column": "AM", "name": "Complemento/estorno de juros DRE N-CIRC"},
             {"column": "AN", "name": "Juros NC x Redutora NC"},
-            {"column": "AO", "name": "Ajuste NC"},
-            {"column": "AT", "name": "Juros C x Resultado"},
+            {"column": "AO/AX", "name": "Transf. Passivo NC/C quando valores sao opostos e iguais"},
+            {"column": "AO", "name": "Ajuste residual NC"},
+            {"column": "AT", "name": "Complemento/estorno de juros DRE CIRC"},
             {"column": "AU", "name": "Juros C x Redutora C"},
             {"column": "AV/AW", "name": "Amortizacao principal e juros"},
-            {"column": "AX", "name": "Ajuste C"},
+            {"column": "AX", "name": "Ajuste residual C"},
             {"column": "BA", "name": "Ajuste no pagamento"},
             {"column": "BB/BC", "name": "Marcadores textuais e D/C para revisao"},
-            {"column": "BD", "name": "Transferencia entre redutoras"},
+            {"column": "BD", "name": "Transf. Juros Passivo NC/C"},
             {"column": "BE/BF", "name": "Reducao de juros redutores"},
         ],
     }

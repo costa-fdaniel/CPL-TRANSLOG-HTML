@@ -210,6 +210,10 @@ function normalizeKey(value) {
   return removeAccents(value).trim().toLowerCase();
 }
 
+function normalizeTypeKey(value) {
+  return normalizeKey(value).replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
+
 function parseAmount(value) {
   const raw = String(value ?? "").trim().replace(/\s/g, "");
   if (!raw) return 0;
@@ -1219,6 +1223,28 @@ function renderLedgerTable() {
   });
 }
 
+function isInterestAction(action) {
+  return [
+    "interest_adjustment",
+    "interest_reversal_dre",
+    "interest_complement_dre",
+  ].includes(action);
+}
+
+function isFixedTransferAction(action) {
+  return ["liability_transfer_nc_current", "interest_transfer_nc_current"].includes(action);
+}
+
+function normalizeScopeValue(value, fallback = "current") {
+  const scope = normalizeKey(value || fallback)
+    .replace("nao_circulante", "non_current")
+    .replace("nao circulante", "non_current")
+    .replace("nao_current", "non_current")
+    .replace("nao current", "non_current")
+    .replace("circulante", "current");
+  return ["current", "non_current", "both"].includes(scope) ? scope : fallback;
+}
+
 function scopeTargets(contract, scope, action) {
   const balances = contract.balances;
   const interestWeights = {
@@ -1229,7 +1255,7 @@ function scopeTargets(contract, scope, action) {
     current: Math.max(0, balances.currentFinal || 0),
     non_current: Math.max(0, balances.nonCurrentFinal || 0),
   };
-  const weights = action === "interest_adjustment" ? interestWeights : principalWeights;
+  const weights = isInterestAction(action) ? interestWeights : principalWeights;
   const totalWeight = weights.current + weights.non_current;
   const base = [
     {
@@ -1302,6 +1328,10 @@ function transactionDescription(action, contract, target, note, settled) {
     payment: `Pagamento/amortizacao ${target.label}${settledText}`,
     interest_adjustment: `Ajuste de juros ${target.label}`,
     liability_adjustment: `Ajuste do passivo ${target.label}`,
+    liability_transfer_nc_current: "Transf. Passivo NC/C",
+    interest_transfer_nc_current: "Transf. Juros Passivo NC/C",
+    interest_reversal_dre: `Estorno de juros (DRE) ${target.label}`,
+    interest_complement_dre: `Complemento de juros (DRE) ${target.label}`,
     settlement: `Quitacao ${target.label}`,
     custom: "Lancamento manual",
   }[action];
@@ -1314,6 +1344,10 @@ function actionExplanation(action) {
     paid_installment_adjustment: "Ajusta uma parcela que ja consta como paga sem apagar o historico. Selecione parcelas pagas; direcao Aumenta estorna o pagamento e reabre saldo, direcao Reduz gera uma baixa complementar.",
     interest_adjustment: "Gera ajuste de juros contra a conta de resultado do contrato. Leasing usa 4773; os demais usam 375. A direcao define se aumenta ou reduz o juros/redutora.",
     liability_adjustment: "Gera ajuste no passivo circulante ou nao circulante. Usa a conta ponte AAA e por isso fica marcado como revisar antes da importacao.",
+    liability_transfer_nc_current: "Transfere passivo do nao circulante para o circulante: debita a conta N-CIRC e credita a conta CIRC do contrato.",
+    interest_transfer_nc_current: "Transfere juros do passivo nao circulante para o circulante: debita a redutora N-CIRC e credita a redutora CIRC.",
+    interest_reversal_dre: "Estorna juros reconhecidos a maior ou que ja deveriam ter sido baixados: debita juros do passivo e credita resultado financeiro.",
+    interest_complement_dre: "Complementa juros nao reconhecidos anteriormente: debita resultado financeiro e credita juros do passivo.",
     settlement: "Registra baixa/quitacao do contrato no alvo escolhido. Se houver parcelas selecionadas, baixa essas parcelas; se o valor ficar vazio, usa o saldo final do alvo quando existir.",
     custom: "Permite informar manualmente debito e credito. Use quando a operacao nao couber nas regras padrao.",
   }[action] || "";
@@ -1324,7 +1358,7 @@ function toggleTransactionFields() {
   const visible = {
     amount: true,
     installments: ["payment", "settlement"].includes(action),
-    scope: ["payment", "settlement", "interest_adjustment", "liability_adjustment"].includes(action),
+    scope: ["payment", "settlement", "interest_adjustment", "liability_adjustment", "interest_reversal_dre", "interest_complement_dre"].includes(action),
     direction: ["paid_installment_adjustment", "interest_adjustment", "liability_adjustment"].includes(action),
     manual: action === "custom",
   };
@@ -1463,6 +1497,8 @@ function simulateTransaction() {
   const resultAccount = resultAccountFor(contract);
   const targets = action === "custom"
     ? [{ scope: "custom", label: "Manual", weight: 1, principalAccount: "", interestAccount: "" }]
+    : isFixedTransferAction(action)
+      ? [{ scope: "transfer", label: "NC/C", weight: 1, principalAccount: "", interestAccount: "" }]
     : scopeTargets(contract, scope, action);
   const selectedInstallments = selectedPaymentInstallments(contract);
   const selectedByKey = selectedInstallmentsByKey(contract);
@@ -1528,6 +1564,22 @@ function simulateTransaction() {
           credit = "AAA";
           rule = "TX-PASSIVO-";
         }
+      } else if (action === "liability_transfer_nc_current") {
+        debit = contract.accounts.naoCirc;
+        credit = contract.accounts.circ;
+        rule = "TX-TRANSF-PASSIVO-NC-C";
+      } else if (action === "interest_transfer_nc_current") {
+        debit = contract.accounts.jurosNaoCirc;
+        credit = contract.accounts.jurosCirc;
+        rule = "TX-TRANSF-JUROS-NC-C";
+      } else if (action === "interest_reversal_dre") {
+        debit = target.interestAccount;
+        credit = resultAccount;
+        rule = "TX-ESTORNO-JUROS-DRE";
+      } else if (action === "interest_complement_dre") {
+        debit = resultAccount;
+        credit = target.interestAccount;
+        rule = "TX-COMP-JUROS-DRE";
       } else {
         debit = els.transactionDebitInput.value.trim();
         credit = els.transactionCreditInput.value.trim();
@@ -1715,12 +1767,12 @@ function parseParcelSpec(spec) {
 }
 
 function targetFromScope(contract, scope, action) {
-  return scopeTargets(contract, scope || "current", action)[0] || scopeTargets(contract, "current", action)[0];
+  const normalizedScope = normalizeScopeValue(scope, "current");
+  return scopeTargets(contract, normalizedScope, action)[0] || scopeTargets(contract, "current", action)[0];
 }
 
 function makeBatchAdjustmentEntries(contract, row, type, date, amount, note) {
-  const scope = normalizeKey(row.alvo || "current").replace("circulante", "current").replace("nao current", "non_current").replace("nao_circulante", "non_current");
-  const normalizedScope = ["current", "non_current", "both"].includes(scope) ? scope : "current";
+  const normalizedScope = normalizeScopeValue(row.alvo, "current");
   const direction = normalizeKey(row.direcao || "increase").includes("redu") ? "decrease" : "increase";
   const action = type === "ajuste_juros" ? "interest_adjustment" : "liability_adjustment";
   const targets = scopeTargets(contract, normalizedScope, action);
@@ -1765,9 +1817,43 @@ function makeBatchAdjustmentEntries(contract, row, type, date, amount, note) {
   return entries;
 }
 
+function makeBatchTransferEntry(contract, typeKey, date, amount, note) {
+  const isInterest = typeKey.includes("juros");
+  return makeManualEntry({
+    contract,
+    date,
+    debit: isInterest ? contract.accounts.jurosNaoCirc : contract.accounts.naoCirc,
+    credit: isInterest ? contract.accounts.jurosCirc : contract.accounts.circ,
+    amount,
+    rule: isInterest ? "CSV-TRANSF-JUROS-NC-C" : "CSV-TRANSF-PASSIVO-NC-C",
+    description: `${isInterest ? "Transf. Juros Passivo NC/C" : "Transf. Passivo NC/C"} via CSV ref. contrato ${contract.contractNumber} aba (${contract.id})${note ? ` - ${note}` : ""}`,
+    sourceColumn: "CSV",
+  });
+}
+
+function makeBatchDreInterestEntries(contract, typeKey, row, date, amount, note) {
+  const normalizedScope = normalizeScopeValue(row.alvo, "both");
+  const isReversal = typeKey.includes("estorno");
+  const resultAccount = resultAccountFor(contract);
+  const targets = scopeTargets(contract, normalizedScope, isReversal ? "interest_reversal_dre" : "interest_complement_dre");
+  return targets.map((target) => {
+    const value = targets.length > 1 ? amount * target.weight : amount;
+    return makeManualEntry({
+      contract,
+      date,
+      debit: isReversal ? target.interestAccount : resultAccount,
+      credit: isReversal ? resultAccount : target.interestAccount,
+      amount: value,
+      rule: isReversal ? "CSV-ESTORNO-JUROS-DRE" : "CSV-COMP-JUROS-DRE",
+      description: `${isReversal ? "Estorno de juros (DRE)" : "Complemento de juros (DRE)"} ${target.label} via CSV ref. contrato ${contract.contractNumber} aba (${contract.id})${note ? ` - ${note}` : ""}`,
+      sourceColumn: "CSV",
+    });
+  }).filter((entry) => entry.amount > 0.005);
+}
+
 function buildBatchEntries(row) {
   const data = row.raw;
-  const type = normalizeKey(data.tipo || data.acao);
+  const type = normalizeTypeKey(data.tipo || data.acao);
   const contract = contractByInput(data.contrato_id || data.contrato || data.id);
   const date = normalizeDate(data.data || data.data_pagamento);
   const note = data.observacao || data.historico || "";
@@ -1840,6 +1926,15 @@ function buildBatchEntries(row) {
       const normalizedType = type.includes("juros") || type.includes("interest") ? "ajuste_juros" : "ajuste_passivo";
       entries = makeBatchAdjustmentEntries(contract, data, normalizedType, date, amount, note);
     }
+  } else if (["transf_passivo_nc_c", "transferencia_passivo_nc_c", "transf_passivo"].includes(type)) {
+    if (amount <= 0) errors.push("Valor da transferencia invalido.");
+    if (!errors.length) entries = [makeBatchTransferEntry(contract, "transf_passivo_nc_c", date, amount, note)];
+  } else if (["transf_juros_nc_c", "transferencia_juros_nc_c", "transf_juros_passivo_nc_c", "transf_juros"].includes(type)) {
+    if (amount <= 0) errors.push("Valor da transferencia de juros invalido.");
+    if (!errors.length) entries = [makeBatchTransferEntry(contract, "transf_juros_nc_c", date, amount, note)];
+  } else if (["estorno_juros_dre", "estorno_de_juros_dre", "complemento_juros_dre", "complemento_de_juros_dre"].includes(type)) {
+    if (amount <= 0) errors.push("Valor de juros DRE invalido.");
+    if (!errors.length) entries = makeBatchDreInterestEntries(contract, type, data, date, amount, note);
   } else {
     errors.push(`Tipo nao reconhecido: ${type}.`);
   }
@@ -2146,6 +2241,10 @@ function downloadBatchTemplate() {
     ["quitacao", "136", "2026-06-30", "41-45", "", "", "", "S", "current", "", "Quitacao por parcelas"],
     ["ajuste_juros", "157", "2026-06-30", "", "1500,00", "", "", "N", "both", "increase", "Ajuste de juros"],
     ["ajuste_passivo", "157", "2026-06-30", "", "1000,00", "", "", "N", "current", "decrease", "Ajuste do passivo"],
+    ["transf_passivo_nc_c", "157", "2026-06-30", "", "1000,00", "", "", "N", "", "", "Transferencia de passivo NC/C"],
+    ["transf_juros_nc_c", "157", "2026-06-30", "", "1000,00", "", "", "N", "", "", "Transferencia de juros NC/C"],
+    ["estorno_juros_dre", "157", "2026-06-30", "", "1000,00", "", "", "N", "both", "", "Estorno de juros DRE"],
+    ["complemento_juros_dre", "157", "2026-06-30", "", "1000,00", "", "", "N", "both", "", "Complemento de juros DRE"],
     ["manual", "2", "2026-06-20", "", "95316,10", "7543", "000", "N", "", "", "Lancamento manual"],
   ];
   downloadTextFile("cpl-translog-modelo-importacao-lote.csv", rows.map((row) => row.join(";")).join("\r\n"), "text/csv;charset=utf-8");
