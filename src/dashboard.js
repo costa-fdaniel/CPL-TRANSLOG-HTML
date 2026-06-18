@@ -12,10 +12,12 @@ const state = {
   pendingSystemState: null,
   contractOverrides: {},
   auditEvents: [],
+  operatorName: "",
 };
 
 const MANUAL_STORAGE_KEY = "cpl-translog-html-manual-entries";
 const LOCAL_STATE_STORAGE_KEY = "cpl-translog-html-local-state";
+const OPERATOR_STORAGE_KEY = "cpl-translog-html-operator";
 const SYSTEM_STATE_SCHEMA = "cpl-translog-system-state";
 const API_BASE = "/api";
 
@@ -34,6 +36,8 @@ const preciseCurrency = new Intl.NumberFormat("pt-BR", {
 const els = {
   status: document.querySelector("#statusLine"),
   fileInput: document.querySelector("#fileInput"),
+  operatorInput: document.querySelector("#operatorInput"),
+  saveOperatorButton: document.querySelector("#saveOperatorButton"),
   search: document.querySelector("#searchInput"),
   statusFilter: document.querySelector("#statusFilter"),
   entityFilter: document.querySelector("#entityFilter"),
@@ -477,6 +481,34 @@ async function apiJson(path, options = {}) {
   return response.json();
 }
 
+function currentOperator() {
+  return String(els.operatorInput?.value || state.operatorName || "").trim();
+}
+
+function loadOperator() {
+  state.operatorName = localStorage.getItem(OPERATOR_STORAGE_KEY) || "";
+  if (els.operatorInput) els.operatorInput.value = state.operatorName;
+}
+
+function saveOperatorName(options = {}) {
+  state.operatorName = currentOperator();
+  localStorage.setItem(OPERATOR_STORAGE_KEY, state.operatorName);
+  if (!options.silent) {
+    els.status.textContent = state.operatorName
+      ? `Operador ativo: ${state.operatorName}.`
+      : "Operador removido. Informe um nome antes de aprovar, exportar ou ajustar contratos.";
+  }
+  return state.operatorName;
+}
+
+function requireOperator(actionLabel) {
+  const operator = saveOperatorName({ silent: true });
+  if (operator) return operator;
+  els.status.textContent = `Informe o operador antes de ${actionLabel}.`;
+  els.operatorInput?.focus();
+  return "";
+}
+
 function persistStateToServer() {
   if (!window.location.protocol.startsWith("http")) return;
   if (!state.data?.contracts?.length) return;
@@ -507,6 +539,9 @@ function auditEventTypeLabel(type) {
     ledger_status: "Fluxo de lancamento",
     export_batch: "Exportacao CSV",
     state_saved: "Estado salvo",
+    contract_override: "Contrato ajustado",
+    contract_override_clear: "Ajuste removido",
+    manual_layer_clear: "Camada HTML limpa",
   };
   return labels[type] || type || "Evento";
 }
@@ -536,10 +571,24 @@ function auditEventDetail(event) {
     const exported = payload.exported ?? 0;
     return `${entries} lancamento(s), ${operations} operacoes, ${overrides} contrato(s) ajustado(s), ${approved} aprovado(s), ${exported} exportado(s).`;
   }
+  if (event.eventType === "contract_override") {
+    return `Cadastro local do contrato ${payload.contractNumber || payload.contractId || "-"} ajustado.`;
+  }
+  if (event.eventType === "contract_override_clear") {
+    return `Ajuste local do contrato ${payload.contractNumber || payload.contractId || "-"} removido.`;
+  }
+  if (event.eventType === "manual_layer_clear") {
+    return `${payload.clearedEntries || 0} lancamento(s) e ${payload.clearedOverrides || 0} ajuste(s) local(is) removido(s).`;
+  }
   return Object.entries(payload)
     .slice(0, 4)
     .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.length : value}`)
     .join(" | ") || "Evento registrado pelo sistema.";
+}
+
+function auditEventActor(event) {
+  const payload = event.payload || {};
+  return payload.operator || payload.approvedBy || payload.reopenedBy || payload.exportedBy || payload.createdBy || "Operador nao informado";
 }
 
 function auditEventTimeLabel(value) {
@@ -580,6 +629,7 @@ function renderBackendAuditEvents() {
         <strong>${escapeHtml(auditEventDetail(event))}</strong>
       </div>
       <div class="audit-event-meta">
+        <span>${escapeHtml(auditEventActor(event))}</span>
         <span>${escapeHtml(event.refId || "-")}</span>
         <time>${escapeHtml(auditEventTimeLabel(event.createdAt))}</time>
       </div>
@@ -1650,8 +1700,11 @@ function inputMoneyValue(input, fallback) {
 function saveContractOverride() {
   const original = state.data?.contracts?.find((contract) => contract.id === state.selectedId);
   if (!original) return;
+  const operator = requireOperator("salvar ajuste de contrato");
+  if (!operator) return;
   const override = {
     updatedAt: new Date().toISOString(),
+    updatedBy: operator,
     fields: {
       status: els.contractStatusOverride.value || original.status,
       type: els.contractTypeOverride.value.trim(),
@@ -1671,6 +1724,12 @@ function saveContractOverride() {
     },
   };
   state.contractOverrides[String(original.id)] = override;
+  postAuditEvent("contract_override", String(original.id), {
+    operator,
+    contractId: original.id,
+    contractNumber: original.contractNumber,
+    changedAt: override.updatedAt,
+  });
   saveManualEntries();
   populatePanelControls();
   populateLedgerControls();
@@ -1679,7 +1738,16 @@ function saveContractOverride() {
 
 function clearContractOverride() {
   if (!state.selectedId) return;
+  const operator = requireOperator("limpar ajuste de contrato");
+  if (!operator) return;
+  const contract = state.data?.contracts?.find((item) => item.id === state.selectedId);
   delete state.contractOverrides[String(state.selectedId)];
+  postAuditEvent("contract_override_clear", String(state.selectedId), {
+    operator,
+    contractId: state.selectedId,
+    contractNumber: contract?.contractNumber || "",
+    changedAt: new Date().toISOString(),
+  });
   saveManualEntries();
   populatePanelControls();
   populateLedgerControls();
@@ -1743,9 +1811,10 @@ function renderOperationalControl() {
           ${escapeHtml(entry.operationStatus || entry.reviewStatus)}
         </span>
       </td>
+      <td>${escapeHtml(entry.exportedBy || entry.approvedBy || entry.reopenedBy || entry.createdBy || "-")}</td>
       <td>${fmtMoney(entry.amount, true)}</td>
     </tr>
-  `).join("") || `<tr><td colspan="6" class="empty-cell">Nenhuma operacao HTML criada.</td></tr>`;
+  `).join("") || `<tr><td colspan="7" class="empty-cell">Nenhuma operacao HTML criada.</td></tr>`;
 }
 
 function renderAudit() {
@@ -2682,7 +2751,7 @@ function postAuditEvent(eventType, refId, payload) {
   if (!window.location.protocol.startsWith("http")) return;
   apiJson("/audit", {
     method: "POST",
-    body: JSON.stringify({ eventType, refId, ...payload }),
+    body: JSON.stringify({ eventType, refId, operator: currentOperator(), ...payload }),
   })
     .then(() => refreshBackendAuditEvents({ silent: true }))
     .catch(() => {});
@@ -2694,6 +2763,8 @@ function updateSelectedManualStatus(status) {
     els.status.textContent = "Selecione lancamentos HTML para alterar o status operacional.";
     return;
   }
+  const operator = requireOperator(status === "aprovado" ? "aprovar lancamentos" : "reabrir lancamentos");
+  if (!operator) return;
   const timestamp = new Date().toISOString();
   const ids = new Set(selected.map((entry) => entry.id));
   state.manualEntries = state.manualEntries.map((entry) => {
@@ -2703,14 +2774,17 @@ function updateSelectedManualStatus(status) {
       ...entry,
       operationStatus: status,
       approvedAt: status === "aprovado" ? timestamp : entry.approvedAt || "",
+      approvedBy: status === "aprovado" ? operator : entry.approvedBy || "",
       reopenedAt: status === "revisar" ? timestamp : entry.reopenedAt || "",
+      reopenedBy: status === "revisar" ? operator : entry.reopenedBy || "",
       statusHistory: [
         ...history,
-        { status, at: timestamp },
+        { status, at: timestamp, operator },
       ],
     };
   });
   postAuditEvent("ledger_status", status, {
+    operator,
     entryIds: [...ids],
     count: ids.size,
     changedAt: timestamp,
@@ -2718,14 +2792,15 @@ function updateSelectedManualStatus(status) {
   saveManualEntries();
   populateLedgerControls();
   applyFilters();
-  els.status.textContent = `${ids.size} lancamento(s) HTML alterado(s) para ${status}.`;
+  els.status.textContent = `${ids.size} lancamento(s) HTML alterado(s) para ${status} por ${operator}.`;
 }
 
-function registerExportBatch(exportBatchId, entries) {
+function registerExportBatch(exportBatchId, entries, operator) {
   if (!window.location.protocol.startsWith("http")) return;
   const payload = {
     id: exportBatchId,
     exportedAt: new Date().toISOString(),
+    operator,
     entryIds: entries.filter((entry) => entry.origin === "manual").map((entry) => entry.id),
     totalEntries: entries.length,
     totalAmount: sum(entries, (entry) => entry.amount),
@@ -2752,6 +2827,8 @@ function exportLedgerCsv() {
     els.status.textContent = `${blocked.length} lancamento(s) HTML precisam ser aprovados antes da exportacao.`;
     return;
   }
+  const operator = requireOperator("exportar CSV contabil");
+  if (!operator) return;
   const exportBatchId = `exp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const header = [
     "Parcelamento",
@@ -2792,7 +2869,7 @@ function exportLedgerCsv() {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
-  registerExportBatch(exportBatchId, entries);
+  registerExportBatch(exportBatchId, entries, operator);
 
   const exportedManualIds = new Set(entries
     .filter((entry) => entry.origin === "manual")
@@ -2801,7 +2878,7 @@ function exportLedgerCsv() {
     const exportedAt = new Date().toISOString();
     state.manualEntries = state.manualEntries.map((entry) => (
       exportedManualIds.has(entry.id)
-        ? { ...entry, operationStatus: "exportado", exportedAt, exportBatchId }
+        ? { ...entry, operationStatus: "exportado", exportedAt, exportedBy: operator, exportBatchId }
         : entry
     ));
     saveManualEntries();
@@ -2819,13 +2896,17 @@ function addDraftTransactionToLedger() {
     renderTransactionPanel();
     return;
   }
+  const operator = requireOperator("adicionar lancamentos a esteira");
+  if (!operator) return;
   const operationId = `op-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const createdAt = new Date().toISOString();
   const entries = state.transactionDraftEntries.map((entry) => ({
     ...entry,
     id: `manual-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     operationId,
     operationStatus: "rascunho",
-    createdAt: new Date().toISOString(),
+    createdAt,
+    createdBy: operator,
   }));
   entries.forEach((entry) => state.selectedLedgerIds.add(entry.id));
   state.manualEntries.push(...entries);
@@ -2859,6 +2940,7 @@ function buildSystemStatePayload() {
     schema: SYSTEM_STATE_SCHEMA,
     version: 2,
     exportedAt: new Date().toISOString(),
+    operator: currentOperator(),
     source: {
       generatedAt: state.data?.metadata?.generatedAt || "",
       sourceFile: state.data?.metadata?.sourceFile || "",
@@ -2899,6 +2981,11 @@ function buildSystemStatePayload() {
       credit: entry.credit,
       amount: entry.amount,
       reviewStatus: entry.reviewStatus,
+      operationStatus: entry.operationStatus || "",
+      createdBy: entry.createdBy || "",
+      approvedBy: entry.approvedBy || "",
+      reopenedBy: entry.reopenedBy || "",
+      exportedBy: entry.exportedBy || "",
       description: entry.description,
     })),
     operationalControl: {
@@ -2910,9 +2997,19 @@ function buildSystemStatePayload() {
 }
 
 function clearManualLayer() {
+  const operator = requireOperator("limpar a camada HTML");
+  if (!operator) return;
+  const clearedEntries = state.manualEntries.length;
+  const clearedOverrides = Object.keys(state.contractOverrides).length;
   state.manualEntries = [];
   state.contractOverrides = {};
   state.selectedLedgerIds.clear();
+  postAuditEvent("manual_layer_clear", "system_state", {
+    operator,
+    clearedEntries,
+    clearedOverrides,
+    changedAt: new Date().toISOString(),
+  });
   saveManualEntries();
   populatePanelControls();
   populateLedgerControls();
@@ -2921,6 +3018,11 @@ function clearManualLayer() {
 
 function importSystemState(payload, options = {}) {
   const entries = Array.isArray(payload?.entries) ? payload.entries : [];
+  if (!currentOperator() && payload?.operator) {
+    state.operatorName = String(payload.operator);
+    if (els.operatorInput) els.operatorInput.value = state.operatorName;
+    localStorage.setItem(OPERATOR_STORAGE_KEY, state.operatorName);
+  }
   state.manualEntries = entries.map((entry) => ({
     ...entry,
     origin: entry.origin || "manual",
@@ -3043,21 +3145,25 @@ async function handleBatchCsvImport(event) {
 }
 
 function addBatchEntriesToLedger() {
-  const operationId = `csv-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  const entries = state.batchImportRows
+  const validEntries = state.batchImportRows
     .filter((row) => row.status !== "erro")
-    .flatMap((row) => row.entries)
-    .map((entry) => ({
-      ...entry,
-      id: `manual-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      operationId,
-      operationStatus: "rascunho",
-      createdAt: new Date().toISOString(),
-    }));
-  if (!entries.length) {
+    .flatMap((row) => row.entries);
+  if (!validEntries.length) {
     renderBatchImport();
     return;
   }
+  const operator = requireOperator("importar lancamentos em lote");
+  if (!operator) return;
+  const operationId = `csv-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const createdAt = new Date().toISOString();
+  const entries = validEntries.map((entry) => ({
+    ...entry,
+    id: `manual-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    operationId,
+    operationStatus: "rascunho",
+    createdAt,
+    createdBy: operator,
+  }));
   entries.forEach((entry) => state.selectedLedgerIds.add(entry.id));
   state.manualEntries.push(...entries);
   state.batchImportRows = [];
@@ -3103,6 +3209,9 @@ els.fileInput.addEventListener("change", async (event) => {
   }
   event.target.value = "";
 });
+
+els.saveOperatorButton.addEventListener("click", () => saveOperatorName());
+els.operatorInput.addEventListener("change", () => saveOperatorName({ silent: true }));
 
 els.tabs.forEach((button) => {
   button.addEventListener("click", () => switchTab(button.dataset.tab));
@@ -3224,4 +3333,5 @@ els.batchCsvInput.addEventListener("change", handleBatchCsvImport);
 els.addBatchEntriesButton.addEventListener("click", addBatchEntriesToLedger);
 els.clearBatchImportButton.addEventListener("click", clearBatchImport);
 
+loadOperator();
 loadDefaultData();

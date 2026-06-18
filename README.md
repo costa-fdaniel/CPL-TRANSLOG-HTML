@@ -80,15 +80,16 @@ As colunas de lancamento sao identificadas pelo cabecalho de cada aba. Quando um
 ## Fluxo de lancamento no sistema
 
 1. Use a aba `Transacoes` para simular eventos novos sobre um contrato.
-2. Para pagamentos, confira as parcelas do contrato, selecione a proxima parcela ou marque varias parcelas pendentes.
-3. Confira quantas parcelas ficam pendentes apos a selecao e o total selecionado.
-4. Para ajustes sem parcela especifica, escolha acao, data, valor, alvo, direcao e se quitou.
-5. Confira a explicacao e a simulacao dos debitos/creditos.
-6. Clique em `Adicionar a esteira`.
-7. O Painel, a aba Contratos e o detalhe do contrato passam a refletir o saldo ajustado pela camada HTML.
-8. Use a aba `Lancamentos` para filtrar e selecionar os lancamentos HTML.
-9. Clique em `Aprovar` para liberar os lancamentos revisados.
-10. Exporte o CSV contabil. Lancamentos HTML ainda em rascunho/revisao nao sao exportados.
+2. Informe o `Operador` no topo antes de adicionar, aprovar, exportar ou ajustar contratos.
+3. Para pagamentos, confira as parcelas do contrato, selecione a proxima parcela ou marque varias parcelas pendentes.
+4. Confira quantas parcelas ficam pendentes apos a selecao e o total selecionado.
+5. Para ajustes sem parcela especifica, escolha acao, data, valor, alvo, direcao e se quitou.
+6. Confira a explicacao e a simulacao dos debitos/creditos.
+7. Clique em `Adicionar a esteira`.
+8. O Painel, a aba Contratos e o detalhe do contrato passam a refletir o saldo ajustado pela camada HTML.
+9. Use a aba `Lancamentos` para filtrar e selecionar os lancamentos HTML.
+10. Clique em `Aprovar` para liberar os lancamentos revisados.
+11. Exporte o CSV contabil. Lancamentos HTML ainda em rascunho/revisao nao sao exportados.
 
 Na esteira existem dois conceitos separados:
 
@@ -96,6 +97,7 @@ Na esteira existem dois conceitos separados:
 - `Fluxo`: etapa operacional (`rascunho`, `aprovado` ou `exportado`).
 
 O botao `Reabrir` volta lancamentos HTML selecionados para revisao operacional. A exportacao marca os lancamentos HTML exportados com lote, data e status `exportado`.
+Cada lancamento HTML pode guardar `createdBy`, `approvedBy`, `reopenedBy` e `exportedBy`, conforme a etapa executada.
 
 ## Auditoria operacional
 
@@ -105,6 +107,7 @@ A aba `Auditoria` tem duas camadas:
 - `Validador operacional`: alertas calculados a partir dos lancamentos, regras, contas e contratos carregados.
 
 Use o filtro do diario para isolar aprovacoes, exportacoes ou salvamentos. O botao `Atualizar` consulta novamente `/api/audit`, util quando outro processo ou navegador tiver gravado eventos no mesmo banco local.
+Os ajustes de cadastro de contrato e a limpeza da camada HTML tambem geram eventos com operador responsavel.
 
 ## Leitura do painel
 
@@ -166,4 +169,4 @@ O backend em `scripts/server.py` foi criado para ser leve e auditavel, sem depen
 - `GET /api/audit`: lista eventos recentes de auditoria.
 - `POST /api/audit`: registra eventos operacionais pontuais.
 
-Esse backend ainda nao e multiusuario com login. Ele e o primeiro passo para substituir a planilha com persistencia real; a proxima evolucao natural e adicionar usuarios, permissoes, identificacao de aprovador e motor financeiro completo para recalcular contratos sem depender das formulas do XLSB.
+Esse backend ainda nao e multiusuario com login. Ele e o primeiro passo para substituir a planilha com persistencia real; a proxima evolucao natural e adicionar usuarios autenticados, permissoes por perfil e motor financeiro completo para recalcular contratos sem depender das formulas do XLSB.

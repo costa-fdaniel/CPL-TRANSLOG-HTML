@@ -15,6 +15,11 @@
             <div class="brand-subtitle">Contratos, operacoes financeiras, lancamentos e auditoria</div>
           </div>
           <div class="toolbar">
+            <label class="operator-control" title="Responsavel pela operacao">
+              <span>Operador</span>
+              <input id="operatorInput" type="text" placeholder="Nome">
+            </label>
+            <button id="saveOperatorButton" class="button secondary" type="button">Salvar operador</button>
             <label class="file-control" title="Carregar JSON processado">
               <span>Carregar JSON</span>
               <input id="fileInput" type="file" accept="application/json,.json,.js">
@@ -589,6 +594,9 @@
                   <option value="ledger_status">Aprovacoes e revisoes</option>
                   <option value="export_batch">Exportacoes</option>
                   <option value="state_saved">Salvamentos</option>
+                  <option value="contract_override">Ajustes de contrato</option>
+                  <option value="contract_override_clear">Ajustes removidos</option>
+                  <option value="manual_layer_clear">Limpeza da camada HTML</option>
                 </select>
                 <button id="refreshAuditButton" class="button secondary">Atualizar</button>
               </div>
@@ -651,6 +659,7 @@
                     <th>Contrato</th>
                     <th>Regra</th>
                     <th>Status</th>
+                    <th>Responsavel</th>
                     <th>Valor</th>
                   </tr>
                 </thead>

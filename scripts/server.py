@@ -141,12 +141,15 @@ def persist_state(payload: dict[str, Any]) -> None:
                 for contract_id, override in overrides.items()
             ],
         )
+        audit_payload = payload.get("counts", {}) if isinstance(payload.get("counts"), dict) else {}
+        if payload.get("operator"):
+            audit_payload = {**audit_payload, "operator": payload.get("operator")}
         conn.execute(
             """
             INSERT INTO audit_events (event_type, ref_id, payload, created_at)
             VALUES (?, ?, ?, ?)
             """,
-            ("state_saved", "system_state", json.dumps(payload.get("counts", {}), ensure_ascii=False), timestamp),
+            ("state_saved", "system_state", json.dumps(audit_payload, ensure_ascii=False), timestamp),
         )
 
 
