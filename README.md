@@ -15,6 +15,8 @@ Dashboard HTML para acompanhamento dos contratos financeiros da TRANSLOG/SAGA/TL
 - painel inicial com filtros proprios por ano e contrato, refletindo tambem lancamentos feitos no HTML.
 - exportacao e importacao do estado operacional do sistema em JSON, incluindo transacoes HTML, saldos recalculados e trilha resumida.
 
+O visual segue um design system interno documentado em [`docs/design-system.md`](docs/design-system.md), com tokens de cor, espacamento, raios, sombras e componentes base para manter a interface consistente.
+
 ## Como atualizar os dados
 
 1. Coloque a planilha `.xlsb` em `data/raw/`.
