@@ -29,40 +29,74 @@
       </header>
 
       <main class="content">
-        <div id="statusLine" class="status-line">Carregando dados...</div>
+        <section class="workspace-shell">
+          <aside class="workspace-sidebar" aria-label="Controle do sistema">
+            <div class="sidebar-card system-card">
+              <span class="eyebrow">Sistema operacional</span>
+              <strong>CPL TRANSLOG</strong>
+              <small>Contratos, lancamentos, fechamento e auditoria em uma base controlada.</small>
+              <div id="statusLine" class="status-line">Carregando dados...</div>
+            </div>
 
-        <nav class="tabs" aria-label="Areas do dashboard">
-          <button class="tab-button active" data-tab="panel">Painel</button>
-          <button class="tab-button" data-tab="contracts">Contratos</button>
-          <button class="tab-button" data-tab="transactions">Lancar</button>
-          <button class="tab-button" data-tab="ledger">Esteira CSV</button>
-          <button class="tab-button" data-tab="audit">Sistema</button>
-        </nav>
+            <nav class="tabs" aria-label="Areas do dashboard">
+              <button class="tab-button active" data-tab="panel">
+                <span>Painel</span>
+                <small>Situacao da carteira</small>
+              </button>
+              <button class="tab-button" data-tab="contracts">
+                <span>Contratos</span>
+                <small>Ficha e cadastro</small>
+              </button>
+              <button class="tab-button" data-tab="transactions">
+                <span>Lancar</span>
+                <small>Operacao assistida</small>
+              </button>
+              <button class="tab-button" data-tab="ledger">
+                <span>Esteira CSV</span>
+                <small>Aprovar e exportar</small>
+              </button>
+              <button class="tab-button" data-tab="audit">
+                <span>Sistema</span>
+                <small>Regras e auditoria</small>
+              </button>
+            </nav>
 
-        <section class="global-filter-bar">
-          <label>
-            <span>Busca geral</span>
-            <input id="searchInput" class="search" type="search" placeholder="Contrato, ID, tipo ou comentario">
-          </label>
-          <label>
-            <span>Status</span>
-            <select id="statusFilter" class="select" aria-label="Status">
-              <option value="all">Todos os status</option>
-              <option value="ativo">Ativos</option>
-              <option value="quitado">Quitados</option>
-            </select>
-          </label>
-          <label>
-            <span>Empresa</span>
-            <select id="entityFilter" class="select" aria-label="Empresa">
-              <option value="all">SAGA + TLOG</option>
-              <option value="SAGA">SAGA</option>
-              <option value="TLOG">TLOG</option>
-            </select>
-          </label>
-        </section>
+            <section class="global-filter-bar">
+              <div class="sidebar-section-title">Filtros globais</div>
+              <label>
+                <span>Busca geral</span>
+                <input id="searchInput" class="search" type="search" placeholder="Contrato, ID, tipo ou comentario">
+              </label>
+              <label>
+                <span>Status</span>
+                <select id="statusFilter" class="select" aria-label="Status">
+                  <option value="all">Todos os status</option>
+                  <option value="ativo">Ativos</option>
+                  <option value="quitado">Quitados</option>
+                </select>
+              </label>
+              <label>
+                <span>Empresa</span>
+                <select id="entityFilter" class="select" aria-label="Empresa">
+                  <option value="all">SAGA + TLOG</option>
+                  <option value="SAGA">SAGA</option>
+                  <option value="TLOG">TLOG</option>
+                </select>
+              </label>
+            </section>
+          </aside>
+
+          <section class="workspace-main">
 
         <section id="panelTab" class="tab-panel active">
+          <section class="view-header">
+            <div>
+              <span class="eyebrow">Visao da carteira</span>
+              <h1>Painel financeiro</h1>
+              <p>Leitura executiva dos contratos, saldos, juros, fluxo previsto e pontos que precisam de revisao.</p>
+            </div>
+          </section>
+
           <details class="section-group" open>
             <summary>
               <span>Visao executiva</span>
@@ -186,6 +220,14 @@
         </section>
 
         <section id="transactionsTab" class="tab-panel">
+          <section class="view-header">
+            <div>
+              <span class="eyebrow">Operacao assistida</span>
+              <h1>Lancar movimentos</h1>
+              <p>Registre pagamentos, ajustes, estornos, complementos e transferencias com previa contabil antes de enviar para a esteira.</p>
+            </div>
+          </section>
+
           <details class="section-group" open>
             <summary>
               <span>Operacao do contrato</span>
@@ -196,6 +238,49 @@
                 <div><strong>1</strong><span>Escolha contrato, acao e parcelas</span></div>
                 <div><strong>2</strong><span>Confira a previa contabil</span></div>
                 <div><strong>3</strong><span>Adicione a esteira CSV</span></div>
+              </section>
+
+              <section class="action-catalog" aria-label="Tipos de movimento">
+                <button class="action-card active" type="button" data-action-card="payment">
+                  <span>Pagamento</span>
+                  <small>Baixa principal, juros ou parcelas selecionadas.</small>
+                </button>
+                <button class="action-card" type="button" data-action-card="paid_installment_adjustment">
+                  <span>Ajustar paga</span>
+                  <small>Corrige parcela ja marcada como paga.</small>
+                </button>
+                <button class="action-card" type="button" data-action-card="interest_adjustment">
+                  <span>Ajuste juros</span>
+                  <small>Aumenta ou reduz juros contra resultado.</small>
+                </button>
+                <button class="action-card" type="button" data-action-card="liability_adjustment">
+                  <span>Ajuste passivo</span>
+                  <small>Ajusta saldo circulante ou nao circulante.</small>
+                </button>
+                <button class="action-card" type="button" data-action-card="liability_transfer_nc_current">
+                  <span>Passivo NC/C</span>
+                  <small>Transfere saldo para curto prazo.</small>
+                </button>
+                <button class="action-card" type="button" data-action-card="interest_transfer_nc_current">
+                  <span>Juros NC/C</span>
+                  <small>Transfere exclusivamente juros.</small>
+                </button>
+                <button class="action-card" type="button" data-action-card="interest_reversal_dre">
+                  <span>Estorno DRE</span>
+                  <small>Reverte juros reconhecidos a maior.</small>
+                </button>
+                <button class="action-card" type="button" data-action-card="interest_complement_dre">
+                  <span>Complemento DRE</span>
+                  <small>Reconhece juros faltantes.</small>
+                </button>
+                <button class="action-card" type="button" data-action-card="settlement">
+                  <span>Quitacao</span>
+                  <small>Baixa o contrato ou parcelas selecionadas.</small>
+                </button>
+                <button class="action-card" type="button" data-action-card="custom">
+                  <span>Manual</span>
+                  <small>Permite informar debito e credito.</small>
+                </button>
               </section>
 
               <section class="grid-two transaction-layout">
@@ -446,6 +531,14 @@
         </section>
 
         <section id="ledgerTab" class="tab-panel">
+          <section class="view-header">
+            <div>
+              <span class="eyebrow">Fechamento contabil</span>
+              <h1>Esteira CSV</h1>
+              <p>Filtre, aprove, reabra e exporte os lancamentos que vao alimentar a contabilidade.</p>
+            </div>
+          </section>
+
           <details class="section-group" open>
             <summary>
               <span>Preparacao do CSV contabil</span>
@@ -568,6 +661,20 @@
         </section>
 
         <section id="contractsTab" class="tab-panel">
+          <section class="view-header">
+            <div>
+              <span class="eyebrow">Base contratual</span>
+              <h1>Contratos</h1>
+              <p>Consulte a ficha do contrato, saldos, contas contabeis e ajustes operacionais que substituem a base importada.</p>
+            </div>
+          </section>
+
+          <details class="section-group" open>
+            <summary>
+              <span>Carteira e ficha do contrato</span>
+              <small>Selecione um contrato para consultar saldos, parcelas e contas contabeis.</small>
+            </summary>
+            <div class="section-content">
           <section class="grid-two contracts-layout">
             <div class="panel">
               <div class="panel-header">
@@ -599,7 +706,15 @@
               <div id="contractDetail" class="panel-body contract-detail-scroll"></div>
             </div>
           </section>
+            </div>
+          </details>
 
+          <details class="section-group">
+            <summary>
+              <span>Cadastro operacional</span>
+              <small>Ajustes locais de status, contas, juros, saldos e comentarios do contrato.</small>
+            </summary>
+            <div class="section-content">
           <section class="panel">
             <div class="panel-header">
               <div class="panel-heading">
@@ -664,9 +779,19 @@
               </div>
             </div>
           </section>
+            </div>
+          </details>
         </section>
 
         <section id="auditTab" class="tab-panel">
+          <section class="view-header">
+            <div>
+              <span class="eyebrow">Controle e confianca</span>
+              <h1>Sistema</h1>
+              <p>Acompanhe validacoes, trilha operacional, conciliacao, diario SQLite e regras monitoradas.</p>
+            </div>
+          </section>
+
           <details class="section-group" open>
             <summary>
               <span>Saude operacional</span>
@@ -813,6 +938,8 @@
           </section>
             </div>
           </details>
+        </section>
+          </section>
         </section>
       </main>
     </div>

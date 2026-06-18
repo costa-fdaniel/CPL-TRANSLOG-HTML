@@ -110,6 +110,7 @@ const els = {
   ledgerCount: document.querySelector("#ledgerCount"),
   transactionContractSelect: document.querySelector("#transactionContractSelect"),
   transactionActionSelect: document.querySelector("#transactionActionSelect"),
+  actionCards: document.querySelectorAll("[data-action-card]"),
   transactionDateInput: document.querySelector("#transactionDateInput"),
   transactionAmountInput: document.querySelector("#transactionAmountInput"),
   transactionInstallmentsInput: document.querySelector("#transactionInstallmentsInput"),
@@ -2284,6 +2285,13 @@ function toggleTransactionFields() {
   });
 }
 
+function syncActionCards() {
+  const action = els.transactionActionSelect.value;
+  els.actionCards.forEach((card) => {
+    card.classList.toggle("active", card.dataset.actionCard === action);
+  });
+}
+
 function simulateSelectedInstallmentPayments(contract, action, selectedInstallments, options = {}) {
   const paymentDate = options.date ?? els.transactionDateInput.value;
   const settled = options.settled ?? els.transactionSettledSelect.value;
@@ -2522,6 +2530,7 @@ function renderTransactionPanel() {
   const contract = selectedTransactionContract();
   const action = els.transactionActionSelect.value;
   toggleTransactionFields();
+  syncActionCards();
   els.transactionExplanation.innerHTML = `<p>${escapeHtml(actionExplanation(action))}</p>`;
 
   if (contract) {
@@ -3498,6 +3507,13 @@ els.auditEventFilter.addEventListener("change", renderBackendAuditEvents);
 els.refreshAuditButton.addEventListener("click", () => refreshBackendAuditEvents());
 els.saveContractOverrideButton.addEventListener("click", saveContractOverride);
 els.clearContractOverrideButton.addEventListener("click", clearContractOverride);
+
+els.actionCards.forEach((card) => {
+  card.addEventListener("click", () => {
+    els.transactionActionSelect.value = card.dataset.actionCard;
+    els.transactionActionSelect.dispatchEvent(new Event("change"));
+  });
+});
 
 [
   els.transactionContractSelect,
