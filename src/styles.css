@@ -1156,6 +1156,62 @@ tbody tr:hover {
   background: linear-gradient(135deg, #ffffff 0%, var(--red-soft) 100%);
 }
 
+.export-readiness {
+  display: block;
+}
+
+.export-readiness-card {
+  align-items: center;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(260px, 1fr) minmax(420px, 1.3fr);
+  padding: 14px;
+}
+
+.export-readiness-main {
+  display: grid;
+  gap: 6px;
+}
+
+.export-readiness-main span,
+.export-readiness-metrics span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.export-readiness-main strong {
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.export-readiness-main small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.export-readiness-metrics {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.export-readiness-metrics div {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--line-soft);
+  border-radius: 7px;
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+}
+
+.export-readiness-metrics strong {
+  color: var(--ink);
+  font-size: 16px;
+}
+
 .validation-list {
   display: grid;
   gap: 8px;
@@ -1566,6 +1622,10 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 
+  .export-readiness-card {
+    grid-template-columns: 1fr;
+  }
+
   .audit-event-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1649,6 +1709,10 @@ tbody tr:hover {
   .recovery-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .export-readiness-metrics {
+    grid-template-columns: 1fr 1fr;
   }
 
   .panel-actions {

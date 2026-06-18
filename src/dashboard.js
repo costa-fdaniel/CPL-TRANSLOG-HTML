@@ -84,6 +84,7 @@ const els = {
   operationTrailTable: document.querySelector("#operationTrailTable tbody"),
   rules: document.querySelector("#rulesTable tbody"),
   ledgerKpis: document.querySelector("#ledgerKpis"),
+  ledgerExportReadiness: document.querySelector("#ledgerExportReadiness"),
   ledgerYearFilter: document.querySelector("#ledgerYearFilter"),
   ledgerDateFrom: document.querySelector("#ledgerDateFrom"),
   ledgerDateTo: document.querySelector("#ledgerDateTo"),
@@ -1330,6 +1331,7 @@ function renderEmpty() {
   els.rules.innerHTML = "";
   els.ledgerTable.innerHTML = "";
   els.ledgerKpis.innerHTML = "";
+  els.ledgerExportReadiness.innerHTML = "";
   els.transactionSimulationTable.innerHTML = "";
   els.manualTransactionsTable.innerHTML = "";
   els.recoverySummary.innerHTML = "";
@@ -1926,6 +1928,7 @@ function renderRules() {
 
 function renderLedgerPanel() {
   renderLedgerKpis();
+  renderLedgerExportReadiness();
   renderLedgerCharts();
   renderLedgerTable();
 }
@@ -1955,6 +1958,63 @@ function renderLedgerKpis() {
       <div class="kpi-value">${escapeHtml(value)}</div>
     </section>
   `).join("");
+}
+
+function selectedLedgerSnapshot() {
+  const selected = state.filteredLedger.filter((entry) => state.selectedLedgerIds.has(entry.id));
+  return selected.length
+    ? { entries: selected, mode: "selecionados" }
+    : { entries: state.filteredLedger, mode: "filtro atual" };
+}
+
+function ledgerExportReadiness() {
+  const { entries, mode } = selectedLedgerSnapshot();
+  const manual = entries.filter((entry) => entry.origin === "manual");
+  const blockedDraft = manual.filter((entry) => !["aprovado", "exportado"].includes(entry.operationStatus));
+  const review = entries.filter((entry) => entry.reviewStatus !== "pronto");
+  const exported = entries.filter((entry) => entry.origin === "manual" && entry.operationStatus === "exportado");
+  const ready = entries.length > 0 && blockedDraft.length === 0 && review.length === 0;
+  return {
+    entries,
+    mode,
+    manual,
+    blockedDraft,
+    review,
+    exported,
+    ready,
+    amount: sum(entries, (entry) => entry.amount),
+    contracts: new Set(entries.map((entry) => entry.contractId)).size,
+  };
+}
+
+function renderLedgerExportReadiness() {
+  const snapshot = ledgerExportReadiness();
+  const tone = snapshot.ready ? "good" : snapshot.entries.length ? "warning" : "danger";
+  const title = snapshot.ready
+    ? "Pronto para exportar"
+    : snapshot.entries.length
+      ? "Revisar antes de exportar"
+      : "Sem lancamentos para exportar";
+  const blockers = [
+    snapshot.blockedDraft.length ? `${snapshot.blockedDraft.length} HTML sem aprovacao operacional` : "",
+    snapshot.review.length ? `${snapshot.review.length} lancamento(s) com situacao a revisar` : "",
+  ].filter(Boolean);
+
+  els.ledgerExportReadiness.innerHTML = `
+    <section class="panel export-readiness-card control-${tone}">
+      <div class="export-readiness-main">
+        <span>Pre-check CSV</span>
+        <strong>${escapeHtml(title)}</strong>
+        <small>${escapeHtml(blockers.join(" | ") || `Base: ${snapshot.mode}. Um ponto de recuperacao sera criado antes da exportacao.`)}</small>
+      </div>
+      <div class="export-readiness-metrics">
+        <div><span>Lancamentos</span><strong>${snapshot.entries.length}</strong></div>
+        <div><span>Contratos</span><strong>${snapshot.contracts}</strong></div>
+        <div><span>Valor</span><strong>${fmtMoney(snapshot.amount)}</strong></div>
+        <div><span>Ja exportados</span><strong>${snapshot.exported.length}</strong></div>
+      </div>
+    </section>
+  `;
 }
 
 function renderLedgerCharts() {
@@ -2835,8 +2895,7 @@ function ledgerRowCells(entry, withCheck = true) {
 }
 
 function selectedLedgerForExport() {
-  const selected = state.filteredLedger.filter((entry) => state.selectedLedgerIds.has(entry.id));
-  return selected.length ? selected : state.filteredLedger;
+  return selectedLedgerSnapshot().entries;
 }
 
 function selectedManualEntries() {
@@ -2927,10 +2986,18 @@ function registerExportBatch(exportBatchId, entries, operator) {
 }
 
 function exportLedgerCsv() {
-  const entries = selectedLedgerForExport();
-  const blocked = entries.filter((entry) => entry.origin === "manual" && entry.operationStatus !== "aprovado" && entry.operationStatus !== "exportado");
-  if (blocked.length) {
-    els.status.textContent = `${blocked.length} lancamento(s) HTML precisam ser aprovados antes da exportacao.`;
+  const snapshot = ledgerExportReadiness();
+  const entries = snapshot.entries;
+  if (snapshot.blockedDraft.length) {
+    els.status.textContent = `${snapshot.blockedDraft.length} lancamento(s) HTML precisam ser aprovados antes da exportacao.`;
+    return;
+  }
+  if (snapshot.review.length) {
+    els.status.textContent = `${snapshot.review.length} lancamento(s) ainda estao a revisar.`;
+    return;
+  }
+  if (!entries.length) {
+    els.status.textContent = "Nenhum lancamento no filtro atual para exportar.";
     return;
   }
   const operator = requireOperator("exportar CSV contabil");

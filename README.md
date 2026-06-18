@@ -99,6 +99,8 @@ Na esteira existem dois conceitos separados:
 O botao `Reabrir` volta lancamentos HTML selecionados para revisao operacional. A exportacao marca os lancamentos HTML exportados com lote, data e status `exportado`.
 Cada lancamento HTML pode guardar `createdBy`, `approvedBy`, `reopenedBy` e `exportedBy`, conforme a etapa executada.
 
+A aba `Lancamentos` mostra um `Pre-check CSV` antes da previa. Ele usa a selecao atual ou, se nada estiver selecionado, o filtro atual. A exportacao fica bloqueada quando existem lancamentos HTML sem aprovacao operacional ou lancamentos com situacao `revisar`.
+
 ## Auditoria operacional
 
 A aba `Auditoria` tem duas camadas:
