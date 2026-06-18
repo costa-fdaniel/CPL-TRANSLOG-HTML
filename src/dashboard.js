@@ -16,6 +16,7 @@ const state = {
 const MANUAL_STORAGE_KEY = "cpl-translog-html-manual-entries";
 const LOCAL_STATE_STORAGE_KEY = "cpl-translog-html-local-state";
 const SYSTEM_STATE_SCHEMA = "cpl-translog-system-state";
+const API_BASE = "/api";
 
 const currency = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -454,9 +455,51 @@ function localStatePayload() {
   };
 }
 
-function saveManualEntries() {
+async function apiJson(path, options = {}) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`API ${response.status}`);
+  }
+  return response.json();
+}
+
+function persistStateToServer() {
+  if (!window.location.protocol.startsWith("http")) return;
+  if (!state.data?.contracts?.length) return;
+  const payload = buildSystemStatePayload();
+  apiJson("/state", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  }).catch(() => {
+    // Fallback local continua sendo a fonte de seguranca quando o servidor nao esta ativo.
+  });
+}
+
+async function hydrateStateFromServer() {
+  if (!window.location.protocol.startsWith("http")) return false;
+  try {
+    const response = await apiJson("/state");
+    if (!response?.found || !response.payload) return false;
+    importSystemState(response.payload, { sync: false, source: "server" });
+    els.status.textContent += ` | estado SQLite aplicado (${response.updatedAt})`;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function saveManualEntries(options = {}) {
   localStorage.setItem(LOCAL_STATE_STORAGE_KEY, JSON.stringify(localStatePayload()));
   localStorage.setItem(MANUAL_STORAGE_KEY, JSON.stringify(state.manualEntries));
+  if (options.sync !== false) {
+    persistStateToServer();
+  }
 }
 
 function loadManualEntries() {
@@ -850,6 +893,15 @@ function setData(data, sourceLabel) {
   applyFilters();
   renderRules();
   renderTransactionPanel();
+  hydrateStateFromServer().then((loaded) => {
+    if (loaded) {
+      populatePanelControls();
+      populateLedgerControls();
+      applyFilters();
+      renderRules();
+      renderTransactionPanel();
+    }
+  });
 }
 
 function populatePanelControls() {
@@ -2479,6 +2531,27 @@ function selectedLedgerForExport() {
   return selected.length ? selected : state.filteredLedger;
 }
 
+function registerExportBatch(exportBatchId, entries) {
+  if (!window.location.protocol.startsWith("http")) return;
+  const payload = {
+    id: exportBatchId,
+    exportedAt: new Date().toISOString(),
+    entryIds: entries.filter((entry) => entry.origin === "manual").map((entry) => entry.id),
+    totalEntries: entries.length,
+    totalAmount: sum(entries, (entry) => entry.amount),
+    filters: {
+      year: els.ledgerYearFilter.value,
+      contract: els.ledgerContractFilter.value,
+      rule: els.ledgerRuleFilter.value,
+      status: els.ledgerReadyFilter.value,
+    },
+  };
+  apiJson("/export-batches", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }).catch(() => {});
+}
+
 function exportLedgerCsv() {
   const entries = selectedLedgerForExport();
   const exportBatchId = `exp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -2521,6 +2594,7 @@ function exportLedgerCsv() {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+  registerExportBatch(exportBatchId, entries);
 
   const exportedManualIds = new Set(entries
     .filter((entry) => entry.origin === "manual")
@@ -2644,7 +2718,7 @@ function clearManualLayer() {
   applyFilters();
 }
 
-function importSystemState(payload) {
+function importSystemState(payload, options = {}) {
   const entries = Array.isArray(payload?.entries) ? payload.entries : [];
   state.manualEntries = entries.map((entry) => ({
     ...entry,
@@ -2658,7 +2732,7 @@ function importSystemState(payload) {
   state.selectedInstallmentKeys.clear();
   state.transactionDraftEntries = [];
   state.batchImportRows = [];
-  saveManualEntries();
+  saveManualEntries({ sync: options.sync !== false });
   if (!state.data?.contracts?.length) {
     state.pendingSystemState = payload;
     els.status.textContent = `Estado importado com ${state.manualEntries.length} transacoes HTML. Carregue data/processed/dashboard.json para aplicar aos contratos.`;
@@ -2668,7 +2742,7 @@ function importSystemState(payload) {
   populateLedgerControls();
   applyFilters();
   renderTransactionPanel();
-  els.status.textContent = `${els.status.textContent} | estado importado: ${state.manualEntries.length} transacoes HTML`;
+  els.status.textContent = `${els.status.textContent} | estado ${options.source === "server" ? "SQLite" : "importado"}: ${state.manualEntries.length} transacoes HTML`;
 }
 
 async function handleSystemStateImport(event) {

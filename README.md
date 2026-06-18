@@ -44,7 +44,32 @@ Depois acesse:
 http://127.0.0.1:8765
 ```
 
+### Modo sistema com SQLite
+
+Para operar com persistencia central local, use o servidor do projeto em vez do `http.server` simples:
+
+```powershell
+python scripts/server.py --host 127.0.0.1 --port 8765
+```
+
+Esse modo serve o mesmo `index.html`, mas tambem habilita a API local em `/api` e grava o estado operacional em:
+
+```text
+data/system/translog.sqlite3
+```
+
+O banco guarda:
+
+- estado operacional completo do HTML;
+- transacoes manuais/importadas;
+- ajustes locais de cadastro de contrato;
+- trilha de auditoria;
+- lotes de exportacao CSV.
+
+Se o HTML for aberto fora desse servidor, o sistema continua funcionando com `localStorage` e arquivos JSON.
+
 Os arquivos em `data/raw/` e `data/processed/` ficam fora do Git por conterem dados financeiros sensiveis.
+O arquivo SQLite em `data/system/` tambem fica fora do Git.
 
 ## Atencao as formulas do XLSB
 
@@ -99,7 +124,7 @@ Parcelamento;Data;Cod. Conta Debito;Cod. Conta Credito;Valor;Cod. Historico;Comp
 
 As transacoes feitas no HTML ficam salvas no navegador como camada local. Elas entram na previa, na exportacao contabil e recalculam os saldos apresentados no Painel/Contratos. Use `Exportar estado JSON` para salvar um backup dessas transacoes manuais e dos saldos atualizados por contrato.
 
-O JSON extraido continua sendo a carga inicial historica. A operacao diaria pode acontecer no HTML por lancamento manual ou importacao CSV; para uma substituicao completa da planilha, a proxima evolucao natural e persistir essa camada em arquivo/base de dados compartilhada e transformar as formulas de juros/amortizacao em um motor financeiro versionado no proprio projeto.
+O JSON extraido continua sendo a carga inicial historica. A operacao diaria pode acontecer no HTML por lancamento manual ou importacao CSV; quando o servidor `scripts/server.py` estiver ativo, essa camada passa a ser gravada tambem no SQLite local.
 
 ## Estado do sistema
 
@@ -111,3 +136,15 @@ Na aba `Transacoes`, use `Exportar estado JSON` para gerar um backup operacional
 - trilha resumida com data, contrato, regra, debito, credito, valor e historico.
 
 Use `Importar estado JSON` para restaurar esse arquivo em outro navegador ou em outro momento. O botao `Carregar JSON` tambem reconhece esse arquivo de estado; quando ele for importado, a camada local e os saldos exibidos sao atualizados.
+
+## Backend local
+
+O backend em `scripts/server.py` foi criado para ser leve e auditavel, sem dependencias extras alem da biblioteca padrao do Python. Endpoints principais:
+
+- `GET /api/health`: verifica servidor e caminho do banco.
+- `GET /api/state`: retorna o ultimo estado operacional salvo.
+- `PUT /api/state`: salva estado operacional completo.
+- `POST /api/export-batches`: registra um lote exportado.
+- `GET /api/audit`: lista eventos recentes de auditoria.
+
+Esse backend ainda nao e multiusuario com login. Ele e o primeiro passo para substituir a planilha com persistencia real; a proxima evolucao natural e adicionar usuarios, permissoes, aprovacao formal e motor financeiro completo para recalcular contratos sem depender das formulas do XLSB.
