@@ -48,6 +48,7 @@ const els = {
   search: document.querySelector("#searchInput"),
   statusFilter: document.querySelector("#statusFilter"),
   entityFilter: document.querySelector("#entityFilter"),
+  activeFilterChips: document.querySelector("#activeFilterChips"),
   tabs: document.querySelectorAll(".tab-button"),
   tabPanels: document.querySelectorAll(".tab-panel"),
   kpis: document.querySelector("#kpis"),
@@ -1374,9 +1375,11 @@ function renderEmpty() {
   els.batchImportTable.innerHTML = "";
   els.transactionExplanation.innerHTML = "";
   els.transactionContractSnapshot.innerHTML = "";
+  renderActiveFilterChips();
 }
 
 function render() {
+  renderActiveFilterChips();
   renderKpis();
   renderPanelCharts();
   renderContractsTable();
@@ -1385,6 +1388,28 @@ function render() {
   renderAudit();
   renderLedgerPanel();
   renderTransactionPanel();
+}
+
+function filterLabel(select, fallback = "Todos") {
+  return select?.selectedOptions?.[0]?.textContent || fallback;
+}
+
+function renderActiveFilterChips() {
+  if (!els.activeFilterChips) return;
+  const chips = [];
+  const search = els.search.value.trim();
+  if (search) chips.push(["Busca", search]);
+  if (els.statusFilter.value !== "all") chips.push(["Status", filterLabel(els.statusFilter)]);
+  if (els.entityFilter.value !== "all") chips.push(["Empresa", filterLabel(els.entityFilter)]);
+  if (els.panelYearFilter?.value && els.panelYearFilter.value !== "all") chips.push(["Ano painel", filterLabel(els.panelYearFilter)]);
+  if (els.panelContractFilter?.value && els.panelContractFilter.value !== "all") chips.push(["Contrato", filterLabel(els.panelContractFilter)]);
+  if (els.ledgerYearFilter?.value && els.ledgerYearFilter.value !== "all") chips.push(["Ano esteira", filterLabel(els.ledgerYearFilter)]);
+  if (els.ledgerReadyFilter?.value && els.ledgerReadyFilter.value !== "all") chips.push(["Situacao", filterLabel(els.ledgerReadyFilter)]);
+  if (els.ledgerFlowFilter?.value && els.ledgerFlowFilter.value !== "all") chips.push(["Fluxo", filterLabel(els.ledgerFlowFilter)]);
+
+  els.activeFilterChips.innerHTML = chips.length
+    ? chips.map(([label, value]) => `<span class="filter-chip"><em>${escapeHtml(label)}</em>${escapeHtml(value)}</span>`).join("")
+    : `<span class="filter-chip filter-chip-muted">Sem filtros restritivos</span>`;
 }
 
 function renderKpis() {
@@ -3533,6 +3558,7 @@ els.entityFilter.addEventListener("change", applyFilters);
   els.panelContractFilter,
 ].forEach((control) => {
   control.addEventListener("change", () => {
+    renderActiveFilterChips();
     renderKpis();
     renderPanelCharts();
   });
