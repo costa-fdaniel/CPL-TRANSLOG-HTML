@@ -454,6 +454,18 @@ button {
   padding: 0 14px;
 }
 
+.panel-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.compact-select {
+  min-width: 190px;
+}
+
 .panel-title {
   color: var(--ink);
   font-size: 14px;
@@ -1350,6 +1362,95 @@ tbody tr:hover {
   overflow: auto;
 }
 
+.audit-event-layout {
+  display: grid;
+  gap: 12px;
+}
+
+.audit-event-summary {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.audit-summary-card {
+  background: #fbfdff;
+  border: 1px solid var(--line-soft);
+  border-radius: 7px;
+  display: grid;
+  gap: 5px;
+  padding: 10px 12px;
+}
+
+.audit-summary-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.audit-summary-card strong {
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.audit-event-list {
+  display: grid;
+  gap: 8px;
+  max-height: 360px;
+  overflow: auto;
+}
+
+.audit-event {
+  align-items: center;
+  background: #fbfdff;
+  border: 1px solid var(--line-soft);
+  border-left: 4px solid var(--muted);
+  border-radius: 7px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 10px 12px;
+}
+
+.audit-event.status {
+  border-left-color: var(--blue);
+}
+
+.audit-event.export {
+  border-left-color: var(--green);
+}
+
+.audit-event.save {
+  border-left-color: var(--amber);
+}
+
+.audit-event-main,
+.audit-event-meta {
+  display: grid;
+  gap: 4px;
+}
+
+.audit-event-main span,
+.audit-event-meta span,
+.audit-event-meta time {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.audit-event-main strong {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.audit-event-meta {
+  justify-items: end;
+  min-width: 150px;
+  text-align: right;
+}
+
 .audit-item {
   border: 1px solid var(--line);
   border-radius: 7px;
@@ -1418,6 +1519,10 @@ tbody tr:hover {
 
   .installment-summary {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .audit-event-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .workflow-strip {
@@ -1491,8 +1596,24 @@ tbody tr:hover {
   .contract-editor-grid,
   .snapshot-grid,
   .contract-metrics,
-  .installment-summary {
+  .installment-summary,
+  .audit-event-summary {
     grid-template-columns: 1fr;
+  }
+
+  .panel-actions {
+    justify-content: stretch;
+  }
+
+  .audit-event {
+    align-items: start;
+    grid-template-columns: 1fr;
+  }
+
+  .audit-event-meta {
+    justify-items: start;
+    min-width: 0;
+    text-align: left;
   }
 
   .contracts-table-wrap,

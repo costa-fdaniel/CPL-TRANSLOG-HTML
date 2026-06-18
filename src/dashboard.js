@@ -11,6 +11,7 @@ const state = {
   panelControlsInitialized: false,
   pendingSystemState: null,
   contractOverrides: {},
+  auditEvents: [],
 };
 
 const MANUAL_STORAGE_KEY = "cpl-translog-html-manual-entries";
@@ -67,6 +68,10 @@ const els = {
   saveContractOverrideButton: document.querySelector("#saveContractOverrideButton"),
   clearContractOverrideButton: document.querySelector("#clearContractOverrideButton"),
   audit: document.querySelector("#auditList"),
+  auditEventFilter: document.querySelector("#auditEventFilter"),
+  refreshAuditButton: document.querySelector("#refreshAuditButton"),
+  backendAuditSummary: document.querySelector("#backendAuditSummary"),
+  backendAuditList: document.querySelector("#backendAuditList"),
   operationalSummary: document.querySelector("#operationalSummary"),
   validationList: document.querySelector("#validationList"),
   reconciliationTable: document.querySelector("#reconciliationTable tbody"),
@@ -497,6 +502,111 @@ async function hydrateStateFromServer() {
   }
 }
 
+function auditEventTypeLabel(type) {
+  const labels = {
+    ledger_status: "Fluxo de lancamento",
+    export_batch: "Exportacao CSV",
+    state_saved: "Estado salvo",
+  };
+  return labels[type] || type || "Evento";
+}
+
+function auditEventClass(type) {
+  if (type === "export_batch") return "export";
+  if (type === "ledger_status") return "status";
+  if (type === "state_saved") return "save";
+  return "info";
+}
+
+function auditEventDetail(event) {
+  const payload = event.payload || {};
+  if (event.eventType === "ledger_status") {
+    const count = payload.count || payload.entryIds?.length || 0;
+    const label = event.refId === "aprovado" ? "aprovado(s)" : "reaberto(s) para revisao";
+    return `${count} lancamento(s) HTML ${label}.`;
+  }
+  if (event.eventType === "export_batch") {
+    return `${payload.totalEntries || 0} lancamento(s) exportado(s), total ${fmtMoney(payload.totalAmount, true)}.`;
+  }
+  if (event.eventType === "state_saved") {
+    const entries = payload.entries ?? "-";
+    const operations = payload.operations ?? "-";
+    const overrides = payload.contractOverrides ?? "-";
+    const approved = payload.approved ?? 0;
+    const exported = payload.exported ?? 0;
+    return `${entries} lancamento(s), ${operations} operacoes, ${overrides} contrato(s) ajustado(s), ${approved} aprovado(s), ${exported} exportado(s).`;
+  }
+  return Object.entries(payload)
+    .slice(0, 4)
+    .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.length : value}`)
+    .join(" | ") || "Evento registrado pelo sistema.";
+}
+
+function auditEventTimeLabel(value) {
+  if (!value) return "-";
+  const [date, time = ""] = String(value).split("T");
+  return `${fmtDateBr(date)} ${time.slice(0, 5)}`.trim();
+}
+
+function renderBackendAuditEvents() {
+  const filter = els.auditEventFilter?.value || "all";
+  const events = state.auditEvents.filter((event) => filter === "all" || event.eventType === filter);
+  const counts = state.auditEvents.reduce((acc, event) => {
+    acc[event.eventType] = (acc[event.eventType] || 0) + 1;
+    return acc;
+  }, {});
+
+  els.backendAuditSummary.innerHTML = [
+    ["Eventos", state.auditEvents.length],
+    ["Aprovacoes/revisoes", counts.ledger_status || 0],
+    ["Exportacoes", counts.export_batch || 0],
+    ["Salvamentos", counts.state_saved || 0],
+  ].map(([label, value]) => `
+    <div class="audit-summary-card">
+      <span>${label}</span>
+      <strong>${value}</strong>
+    </div>
+  `).join("");
+
+  if (!window.location.protocol.startsWith("http")) {
+    els.backendAuditList.innerHTML = `<div class="empty-state">Abra pelo servidor local para visualizar a trilha SQLite.</div>`;
+    return;
+  }
+
+  els.backendAuditList.innerHTML = events.slice(0, 80).map((event) => `
+    <article class="audit-event ${auditEventClass(event.eventType)}">
+      <div class="audit-event-main">
+        <span>${escapeHtml(auditEventTypeLabel(event.eventType))}</span>
+        <strong>${escapeHtml(auditEventDetail(event))}</strong>
+      </div>
+      <div class="audit-event-meta">
+        <span>${escapeHtml(event.refId || "-")}</span>
+        <time>${escapeHtml(auditEventTimeLabel(event.createdAt))}</time>
+      </div>
+    </article>
+  `).join("") || `<div class="empty-state">Nenhum evento encontrado para o filtro atual.</div>`;
+}
+
+async function refreshBackendAuditEvents(options = {}) {
+  if (!window.location.protocol.startsWith("http")) {
+    renderBackendAuditEvents();
+    return;
+  }
+  try {
+    const events = await apiJson("/audit");
+    state.auditEvents = Array.isArray(events) ? events : [];
+    renderBackendAuditEvents();
+    if (!options.silent) {
+      els.status.textContent = `Auditoria atualizada com ${state.auditEvents.length} evento(s).`;
+    }
+  } catch (error) {
+    renderBackendAuditEvents();
+    if (!options.silent) {
+      els.status.textContent = `Nao foi possivel atualizar a auditoria: ${error.message}`;
+    }
+  }
+}
+
 function saveManualEntries(options = {}) {
   localStorage.setItem(LOCAL_STATE_STORAGE_KEY, JSON.stringify(localStatePayload()));
   localStorage.setItem(MANUAL_STORAGE_KEY, JSON.stringify(state.manualEntries));
@@ -904,6 +1014,7 @@ function setData(data, sourceLabel) {
       renderRules();
       renderTransactionPanel();
     }
+    refreshBackendAuditEvents({ silent: true });
   });
 }
 
@@ -1080,6 +1191,8 @@ function renderEmpty() {
   els.validationList.innerHTML = "";
   els.reconciliationTable.innerHTML = "";
   els.operationTrailTable.innerHTML = "";
+  els.backendAuditSummary.innerHTML = "";
+  els.backendAuditList.innerHTML = "";
   els.rules.innerHTML = "";
   els.ledgerTable.innerHTML = "";
   els.ledgerKpis.innerHTML = "";
@@ -1637,8 +1750,10 @@ function renderOperationalControl() {
 
 function renderAudit() {
   renderOperationalControl();
-  const selectedOnly = state.data.audit.filter((item) => item.contractId === state.selectedId);
-  const items = selectedOnly.length ? selectedOnly : state.data.audit.slice(0, 50);
+  renderBackendAuditEvents();
+  const sourceAudit = state.data.audit || [];
+  const selectedOnly = sourceAudit.filter((item) => item.contractId === state.selectedId);
+  const items = selectedOnly.length ? selectedOnly : sourceAudit.slice(0, 50);
   els.audit.innerHTML = items.map((item) => `
     <div class="audit-item ${escapeHtml(item.severity)}">
       <div class="audit-message"><strong>${escapeHtml(item.contractId || "-")}</strong> ${escapeHtml(item.message)}</div>
@@ -2568,7 +2683,9 @@ function postAuditEvent(eventType, refId, payload) {
   apiJson("/audit", {
     method: "POST",
     body: JSON.stringify({ eventType, refId, ...payload }),
-  }).catch(() => {});
+  })
+    .then(() => refreshBackendAuditEvents({ silent: true }))
+    .catch(() => {});
 }
 
 function updateSelectedManualStatus(status) {
@@ -2617,12 +2734,15 @@ function registerExportBatch(exportBatchId, entries) {
       contract: els.ledgerContractFilter.value,
       rule: els.ledgerRuleFilter.value,
       status: els.ledgerReadyFilter.value,
+      flow: els.ledgerFlowFilter.value,
     },
   };
   apiJson("/export-batches", {
     method: "POST",
     body: JSON.stringify(payload),
-  }).catch(() => {});
+  })
+    .then(() => refreshBackendAuditEvents({ silent: true }))
+    .catch(() => {});
 }
 
 function exportLedgerCsv() {
@@ -2748,6 +2868,9 @@ function buildSystemStatePayload() {
       entries: entries.length,
       ready: entries.filter((entry) => entry.reviewStatus === "pronto").length,
       review: entries.filter((entry) => entry.reviewStatus !== "pronto").length,
+      approved: entries.filter((entry) => entry.operationStatus === "aprovado").length,
+      exported: entries.filter((entry) => entry.operationStatus === "exportado").length,
+      draft: entries.filter((entry) => entry.operationStatus !== "aprovado" && entry.operationStatus !== "exportado").length,
       operations: new Set(entries.map((entry) => entry.operationId).filter(Boolean)).size,
       contractOverrides: Object.keys(state.contractOverrides).length,
     },
@@ -3042,6 +3165,8 @@ els.toggleVisibleLedger.addEventListener("change", () => {
 });
 
 els.exportLedgerButton.addEventListener("click", exportLedgerCsv);
+els.auditEventFilter.addEventListener("change", renderBackendAuditEvents);
+els.refreshAuditButton.addEventListener("click", () => refreshBackendAuditEvents());
 els.saveContractOverrideButton.addEventListener("click", saveContractOverride);
 els.clearContractOverrideButton.addEventListener("click", clearContractOverride);
 

@@ -577,6 +577,28 @@
         <section id="auditTab" class="tab-panel">
           <section id="operationalSummary" class="control-grid"></section>
 
+          <section class="panel">
+            <div class="panel-header">
+              <div class="panel-heading">
+                <div class="panel-title">Diario do sistema</div>
+                <div class="panel-subtitle">Eventos salvos no SQLite: aprovacoes, exportacoes, salvamentos e ajustes.</div>
+              </div>
+              <div class="panel-actions">
+                <select id="auditEventFilter" class="select compact-select" aria-label="Filtro de evento">
+                  <option value="all">Todos os eventos</option>
+                  <option value="ledger_status">Aprovacoes e revisoes</option>
+                  <option value="export_batch">Exportacoes</option>
+                  <option value="state_saved">Salvamentos</option>
+                </select>
+                <button id="refreshAuditButton" class="button secondary">Atualizar</button>
+              </div>
+            </div>
+            <div class="panel-body audit-event-layout">
+              <div id="backendAuditSummary" class="audit-event-summary"></div>
+              <div id="backendAuditList" class="audit-event-list"></div>
+            </div>
+          </section>
+
           <section class="grid-two">
             <div class="panel">
               <div class="panel-header">

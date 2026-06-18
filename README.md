@@ -97,6 +97,15 @@ Na esteira existem dois conceitos separados:
 
 O botao `Reabrir` volta lancamentos HTML selecionados para revisao operacional. A exportacao marca os lancamentos HTML exportados com lote, data e status `exportado`.
 
+## Auditoria operacional
+
+A aba `Auditoria` tem duas camadas:
+
+- `Diario do sistema`: eventos gravados no SQLite, como salvamentos de estado, aprovacoes/reaberturas de lancamentos e exportacoes CSV.
+- `Validador operacional`: alertas calculados a partir dos lancamentos, regras, contas e contratos carregados.
+
+Use o filtro do diario para isolar aprovacoes, exportacoes ou salvamentos. O botao `Atualizar` consulta novamente `/api/audit`, util quando outro processo ou navegador tiver gravado eventos no mesmo banco local.
+
 ## Leitura do painel
 
 O `Painel` abre no ano corrente quando esse ano existe na base e permite trocar para qualquer ano ou contrato especifico. Os cartoes, composicao da divida, maiores contratos, carteira por tipo e fluxo mensal usam essa selecao. Quando uma transacao e adicionada ou um CSV em lote e importado, a visao do painel e recalculada junto com a esteira.
@@ -155,5 +164,6 @@ O backend em `scripts/server.py` foi criado para ser leve e auditavel, sem depen
 - `PUT /api/state`: salva estado operacional completo.
 - `POST /api/export-batches`: registra um lote exportado.
 - `GET /api/audit`: lista eventos recentes de auditoria.
+- `POST /api/audit`: registra eventos operacionais pontuais.
 
-Esse backend ainda nao e multiusuario com login. Ele e o primeiro passo para substituir a planilha com persistencia real; a proxima evolucao natural e adicionar usuarios, permissoes, aprovacao formal e motor financeiro completo para recalcular contratos sem depender das formulas do XLSB.
+Esse backend ainda nao e multiusuario com login. Ele e o primeiro passo para substituir a planilha com persistencia real; a proxima evolucao natural e adicionar usuarios, permissoes, identificacao de aprovador e motor financeiro completo para recalcular contratos sem depender das formulas do XLSB.
