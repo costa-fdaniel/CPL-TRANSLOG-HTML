@@ -1392,16 +1392,16 @@ function renderKpis() {
   const interest = panelInterestAmount(entries);
   const manualEntries = entries.filter((entry) => entry.origin === "manual");
   const items = [
-    ["Contratos", contracts.length],
-    ["Ativos", contracts.filter((contract) => contract.status === "ativo").length],
-    ["Quitados", contracts.filter((contract) => contract.status === "quitado").length],
-    ["Divida final", fmtMoneyCompact(sum(contracts, (contract) => contract.balances.finalDebt))],
-    ["Juros no ano", fmtMoneyCompact(interest)],
-    ["Lancamentos filtrados", entries.length],
-    ["Transacoes HTML", manualEntries.length],
+    ["Contratos", contracts.length, "neutral"],
+    ["Ativos", contracts.filter((contract) => contract.status === "ativo").length, "good"],
+    ["Quitados", contracts.filter((contract) => contract.status === "quitado").length, "muted"],
+    ["Divida final", fmtMoneyCompact(sum(contracts, (contract) => contract.balances.finalDebt)), "primary"],
+    ["Juros no ano", fmtMoneyCompact(interest), "warning"],
+    ["Lancamentos filtrados", entries.length, "info"],
+    ["Transacoes HTML", manualEntries.length, "html"],
   ];
-  els.kpis.innerHTML = items.map(([label, value]) => `
-    <section class="kpi">
+  els.kpis.innerHTML = items.map(([label, value, tone]) => `
+    <section class="kpi kpi-${tone}">
       <div class="kpi-label">${label}</div>
       <div class="kpi-value">${escapeHtml(value)}</div>
     </section>
@@ -1435,21 +1435,22 @@ function renderPanelSummary() {
   const reviewCount = entries.filter((entry) => entry.reviewStatus === "revisar").length;
   const ledgerAmount = sum(entries, (entry) => entry.amount);
   els.panelSummary.innerHTML = `
-    <div class="summary-hero">
+    <div class="summary-hero summary-balance">
       <span>Saldo atualizado no sistema</span>
       <strong title="${fmtMoney(finalDebt, true)}">${fmtMoneyCompact(finalDebt)}</strong>
       <small>${principalImpact <= 0 ? "Reducao" : "Aumento"} pela camada HTML: ${fmtMoneyCompact(Math.abs(principalImpact))}</small>
     </div>
-    <div class="summary-tile">
+    <div class="summary-tile summary-pending">
       <span>Parcelas pendentes</span>
       <strong>${pendingInstallments}</strong>
+      <small>Depois dos filtros atuais</small>
     </div>
-    <div class="summary-tile">
+    <div class="summary-tile summary-flow">
       <span>Fluxo filtrado</span>
       <strong title="${fmtMoney(ledgerAmount, true)}">${fmtMoneyCompact(ledgerAmount)}</strong>
       <small>${entries.length} lancamento(s)</small>
     </div>
-    <div class="summary-tile">
+    <div class="summary-tile summary-interest">
       <span>Juros / revisar</span>
       <strong title="${fmtMoney(interestAmount, true)}">${fmtMoneyCompact(interestAmount)}</strong>
       <small>${manualEntries.length} HTML | ${reviewCount} revisar</small>
@@ -1582,8 +1583,16 @@ function renderReviewChart() {
   const total = Math.max(ready + review, 1);
   const readyPct = (ready / total) * 100;
   const reviewPct = (review / total) * 100;
+  const tone = review === 0 ? "ok" : reviewPct < 5 ? "attention" : "warning";
   els.reviewChart.innerHTML = `
-    <div class="review-track">
+    <div class="review-header">
+      <div>
+        <span>Qualidade da esteira</span>
+        <strong>${readyPct.toFixed(1).replace(".", ",")}%</strong>
+      </div>
+      <em class="review-status review-status-${tone}">${review === 0 ? "Sem revisao" : `${review} revisar`}</em>
+    </div>
+    <div class="review-track" title="${ready} prontos | ${review} a revisar">
       <div class="review-ready" style="width:${readyPct}%"></div>
       <div class="review-warning" style="width:${reviewPct}%"></div>
     </div>
