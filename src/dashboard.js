@@ -1470,17 +1470,14 @@ function renderMonthlyChart() {
     els.monthlyChart.innerHTML = `<div class="empty-state">Sem fluxo para o filtro atual.</div>`;
     return;
   }
-  const max = Math.max(...series.map((item) => item.amount), 1);
-  els.monthlyChart.innerHTML = series.map((item) => {
-    const height = Math.max(3, (item.amount / max) * 100);
-    return `
-      <div class="bar-wrap" title="${escapeHtml(item.label)}: ${fmtMoney(item.amount, true)}">
-        <div class="bar-value">${fmtMoneyCompact(item.amount)}</div>
-        <div class="bar" style="height:${height}%"></div>
-        <div class="bar-label">${escapeHtml(item.display)}</div>
-      </div>
-    `;
-  }).join("");
+  renderSvgBarChart(els.monthlyChart, series, {
+    labelKey: "display",
+    valueKey: "amount",
+    title: "Fluxo mensal previsto",
+    tone: "blue",
+    valueFormatter: fmtMoneyCompact,
+    preciseFormatter: (value) => fmtMoney(value, true),
+  });
 }
 
 function renderDebtSplit() {
@@ -1593,6 +1590,76 @@ function renderReviewChart() {
     <div class="review-grid">
       <div><span>Prontos</span><strong>${ready}</strong><small>${readyPct.toFixed(1).replace(".", ",")}%</small></div>
       <div><span>A revisar</span><strong>${review}</strong><small>${reviewPct.toFixed(1).replace(".", ",")}%</small></div>
+    </div>
+  `;
+}
+
+function renderSvgBarChart(container, items, options = {}) {
+  if (!items.length) {
+    container.innerHTML = `<div class="empty-state">Sem dados no filtro atual.</div>`;
+    return;
+  }
+  const labelKey = options.labelKey || "label";
+  const valueKey = options.valueKey || "value";
+  const valueFormatter = options.valueFormatter || ((value) => fmtMoneyCompact(value));
+  const preciseFormatter = options.preciseFormatter || ((value) => fmtMoney(value, true));
+  const values = items.map((item) => Math.max(0, Number(item[valueKey]) || 0));
+  const max = Math.max(...values, 1);
+  const total = sum(items, (item) => Number(item[valueKey]) || 0);
+  const peak = items[values.indexOf(max)] || items[0];
+  const gradientId = `${container.id || "chart"}Gradient`;
+  const greenGradientId = `${container.id || "chart"}GreenGradient`;
+  const width = Math.max(760, items.length * 72);
+  const height = 276;
+  const margin = { top: 26, right: 18, bottom: 44, left: 48 };
+  const chartWidth = width - margin.left - margin.right;
+  const chartHeight = height - margin.top - margin.bottom;
+  const slot = chartWidth / items.length;
+  const barWidth = Math.min(42, Math.max(22, slot * 0.54));
+  const gridLines = [0.25, 0.5, 0.75, 1].map((ratio) => {
+    const y = margin.top + chartHeight - chartHeight * ratio;
+    return `<line class="svg-grid-line" x1="${margin.left}" y1="${y.toFixed(2)}" x2="${(width - margin.right).toFixed(2)}" y2="${y.toFixed(2)}"></line>`;
+  }).join("");
+
+  const bars = items.map((item, index) => {
+    const value = Math.max(0, Number(item[valueKey]) || 0);
+    const barHeight = Math.max(value > 0 ? 3 : 0, (value / max) * chartHeight);
+    const x = margin.left + index * slot + (slot - barWidth) / 2;
+    const y = margin.top + chartHeight - barHeight;
+    const label = String(item[labelKey] ?? "-");
+    const count = item.count ? `<tspan class="svg-count" x="${(x + barWidth / 2).toFixed(2)}" dy="13">${item.count} lanc.</tspan>` : "";
+    return `
+      <g class="svg-bar-group">
+        <title>${escapeHtml(label)}: ${escapeHtml(preciseFormatter(value))}${item.count ? ` | ${item.count} lancamento(s)` : ""}</title>
+        <text class="svg-value" x="${(x + barWidth / 2).toFixed(2)}" y="${Math.max(14, y - 8).toFixed(2)}">${escapeHtml(valueFormatter(value))}${count}</text>
+        <rect class="svg-bar ${options.tone === "green" ? "svg-bar-green" : ""}" style="fill:url(#${escapeHtml(options.tone === "green" ? greenGradientId : gradientId)})" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barWidth.toFixed(2)}" height="${barHeight.toFixed(2)}" rx="8"></rect>
+        <text class="svg-label" x="${(x + barWidth / 2).toFixed(2)}" y="${(height - 16).toFixed(2)}">${escapeHtml(label)}</text>
+      </g>
+    `;
+  }).join("");
+
+  container.innerHTML = `
+    <div class="svg-chart-shell">
+      <svg class="svg-bar-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(options.title || "Grafico")}">
+        <defs>
+          <linearGradient id="${escapeHtml(gradientId)}" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#2563eb"></stop>
+            <stop offset="100%" stop-color="#0f766e"></stop>
+          </linearGradient>
+          <linearGradient id="${escapeHtml(greenGradientId)}" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#0f766e"></stop>
+            <stop offset="100%" stop-color="#86a32b"></stop>
+          </linearGradient>
+        </defs>
+        <line class="svg-axis-line" x1="${margin.left}" y1="${margin.top + chartHeight}" x2="${width - margin.right}" y2="${margin.top + chartHeight}"></line>
+        ${gridLines}
+        ${bars}
+      </svg>
+      <div class="chart-summary-strip">
+        <span>Total <strong>${escapeHtml(valueFormatter(total))}</strong></span>
+        <span>Pico <strong>${escapeHtml(peak[labelKey] ?? "-")}</strong></span>
+        <span>Media <strong>${escapeHtml(valueFormatter(total / Math.max(items.length, 1)))}</strong></span>
+      </div>
     </div>
   `;
 }
@@ -2072,17 +2139,14 @@ function renderLedgerCharts() {
   }, {}))
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  const maxMonth = Math.max(...byMonth.map((item) => item.amount), 1);
-  els.ledgerMonthChart.innerHTML = byMonth.map((item) => {
-    const height = Math.max(2, (item.amount / maxMonth) * 128);
-    return `
-      <div class="bar-wrap narrow" title="${escapeHtml(item.date)}: ${fmtMoney(item.amount, true)} | ${item.count} lancamento(s)">
-        <div class="bar-count">${item.count}</div>
-        <div class="bar ledger" style="height:${height}px"></div>
-        <div class="bar-label">${escapeHtml(item.label)}</div>
-      </div>
-    `;
-  }).join("") || `<div class="empty-state">Sem lancamentos no filtro.</div>`;
+  renderSvgBarChart(els.ledgerMonthChart, byMonth, {
+    labelKey: "label",
+    valueKey: "amount",
+    title: "Lancamentos por mes",
+    tone: "green",
+    valueFormatter: fmtMoneyCompact,
+    preciseFormatter: (value) => fmtMoney(value, true),
+  });
 
   const byRule = entriesFromGroup(groupSum(
     state.filteredLedger,

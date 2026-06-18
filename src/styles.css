@@ -1017,6 +1017,82 @@ button:disabled {
   height: 220px;
 }
 
+.svg-chart-shell {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 100%;
+  overflow-x: auto;
+  padding: var(--space-2) 0 0;
+}
+
+.svg-bar-chart {
+  display: block;
+  min-width: 720px;
+  width: 100%;
+}
+
+.svg-grid-line {
+  stroke: #e7edf5;
+  stroke-dasharray: 4 6;
+  stroke-width: 1;
+}
+
+.svg-axis-line {
+  stroke: #cbd5e1;
+  stroke-width: 1;
+}
+
+.svg-bar {
+  filter: drop-shadow(0 8px 10px rgba(31, 95, 191, 0.12));
+  transition: opacity 0.15s ease;
+}
+
+.svg-bar-group:hover .svg-bar {
+  opacity: 0.82;
+}
+
+.svg-value {
+  fill: var(--ink);
+  font-size: 11px;
+  font-weight: 800;
+  text-anchor: middle;
+}
+
+.svg-count {
+  fill: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.svg-label {
+  fill: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  text-anchor: middle;
+}
+
+.chart-summary-strip {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.chart-summary-strip span {
+  background: #f8fbff;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  display: grid;
+  gap: var(--space-1);
+  min-height: 54px;
+  padding: var(--space-3) var(--space-4);
+}
+
+.chart-summary-strip strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
 .bar-wrap {
   align-items: center;
   display: grid;
@@ -1117,6 +1193,7 @@ button:disabled {
   align-items: center;
   aspect-ratio: 1;
   border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7), 0 18px 34px rgba(16, 24, 40, 0.08);
   display: grid;
   justify-items: center;
   min-width: 0;
@@ -1205,7 +1282,7 @@ button:disabled {
 
 .rank-chart {
   display: grid;
-  gap: 8px;
+  gap: var(--space-4);
 }
 
 #entityChart.rank-chart,
@@ -1215,24 +1292,24 @@ button:disabled {
 
 .rank-row {
   align-items: center;
-  background: transparent;
-  border: 0;
+  background: #ffffff;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
   display: grid;
-  gap: 10px;
-  grid-template-columns: minmax(110px, 190px) 1fr minmax(82px, auto);
-  min-height: 32px;
-  padding: 0;
+  gap: var(--space-4);
+  grid-template-columns: minmax(140px, 220px) 1fr minmax(92px, auto);
+  min-height: 42px;
+  padding: var(--space-2) var(--space-3);
   text-align: left;
   width: 100%;
 }
 
 .rank-clickable {
-  border-radius: 6px;
   cursor: pointer;
-  padding: 4px;
 }
 
 .rank-clickable:hover {
+  border-color: var(--border-soft);
   background: #f3f8ff;
 }
 
@@ -1269,13 +1346,13 @@ button:disabled {
 
 .rank-track {
   background: #edf2f7;
-  border-radius: 999px;
-  height: 10px;
+  border-radius: var(--radius-pill);
+  height: 12px;
   overflow: hidden;
 }
 
 .rank-bar {
-  background: linear-gradient(90deg, #1f5fbf 0%, #3777de 100%);
+  background: linear-gradient(90deg, #1f5fbf 0%, #3b82f6 60%, #0f766e 100%);
   border-radius: inherit;
   height: 100%;
 }
@@ -2075,6 +2152,14 @@ tbody tr:hover {
 
   .action-catalog {
     grid-template-columns: 1fr;
+  }
+
+  .chart-summary-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .svg-bar-chart {
+    min-width: 620px;
   }
 
   .panel-columns {
