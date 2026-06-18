@@ -79,17 +79,13 @@ As colunas de lancamento sao identificadas pelo cabecalho de cada aba. Quando um
 
 ## Fluxo de lancamento no sistema
 
-1. Use a aba `Transacoes` para simular eventos novos sobre um contrato.
+1. Use `Painel` para enxergar a posicao geral por ano, contrato, empresa e status.
 2. Informe o `Operador` no topo antes de adicionar, aprovar, exportar ou ajustar contratos.
-3. Para pagamentos, confira as parcelas do contrato, selecione a proxima parcela ou marque varias parcelas pendentes.
-4. Confira quantas parcelas ficam pendentes apos a selecao e o total selecionado.
-5. Para ajustes sem parcela especifica, escolha acao, data, valor, alvo, direcao e se quitou.
-6. Confira a explicacao e a simulacao dos debitos/creditos.
-7. Clique em `Adicionar a esteira`.
-8. O Painel, a aba Contratos e o detalhe do contrato passam a refletir o saldo ajustado pela camada HTML.
-9. Use a aba `Lancamentos` para filtrar e selecionar os lancamentos HTML.
-10. Clique em `Aprovar` para liberar os lancamentos revisados.
-11. Exporte o CSV contabil. Lancamentos HTML ainda em rascunho/revisao nao sao exportados.
+3. Use `Contratos` para revisar cadastro, contas, saldos, juros e parcelas do contrato.
+4. Use `Lancar` para escolher contrato, acao, parcelas e conferir a previa contabil.
+5. Clique em `Adicionar a esteira` para salvar o lancamento HTML.
+6. Use `Esteira CSV` para filtrar, aprovar/reabrir e exportar o CSV contabil.
+7. Use `Sistema` apenas para auditoria, validacao, reconciliacao e regras monitoradas.
 
 Na esteira existem dois conceitos separados:
 

@@ -12,7 +12,7 @@
         <div class="topbar-inner">
           <div class="brand">
             <div class="brand-title">CPL TRANSLOG HTML</div>
-            <div class="brand-subtitle">Contratos, operacoes financeiras, lancamentos e auditoria</div>
+            <div class="brand-subtitle">Controle de contratos, parcelas e CSV contabil</div>
           </div>
           <div class="toolbar">
             <label class="operator-control" title="Responsavel pela operacao">
@@ -33,10 +33,10 @@
 
         <nav class="tabs" aria-label="Areas do dashboard">
           <button class="tab-button active" data-tab="panel">Painel</button>
-          <button class="tab-button" data-tab="transactions">Transacoes</button>
-          <button class="tab-button" data-tab="ledger">Lancamentos</button>
           <button class="tab-button" data-tab="contracts">Contratos</button>
-          <button class="tab-button" data-tab="audit">Auditoria</button>
+          <button class="tab-button" data-tab="transactions">Lancar</button>
+          <button class="tab-button" data-tab="ledger">Esteira CSV</button>
+          <button class="tab-button" data-tab="audit">Sistema</button>
         </nav>
 
         <section class="global-filter-bar">
@@ -165,15 +165,15 @@
 
         <section id="transactionsTab" class="tab-panel">
           <section class="workflow-strip">
-            <div><strong>1</strong><span>Selecione contrato e acao</span></div>
-            <div><strong>2</strong><span>Escolha parcelas ou importe CSV</span></div>
-            <div><strong>3</strong><span>Revise a previa e adicione a esteira</span></div>
+            <div><strong>1</strong><span>Escolha contrato, acao e parcelas</span></div>
+            <div><strong>2</strong><span>Confira a previa contabil</span></div>
+            <div><strong>3</strong><span>Adicione a esteira CSV</span></div>
           </section>
 
           <section class="grid-two transaction-layout">
             <div class="panel">
               <div class="panel-header">
-                <div class="panel-title">Nova transacao</div>
+                <div class="panel-title">Lancamento do contrato</div>
                 <div class="action-row">
                   <button id="simulateTransactionButton" class="button">Simular</button>
                   <button id="addTransactionButton" class="button primary">Adicionar a esteira</button>
@@ -252,7 +252,7 @@
 
             <div class="panel">
               <div class="panel-header">
-                <div class="panel-title">Explicacao da acao</div>
+                <div class="panel-title">Resumo do contrato</div>
               </div>
               <div class="panel-body">
                 <div id="transactionExplanation" class="explanation-box"></div>
@@ -293,7 +293,7 @@
 
           <section class="panel">
             <div class="panel-header">
-              <div class="panel-title">Simulacao</div>
+              <div class="panel-title">Previa do lancamento</div>
               <div id="transactionSimulationCount" class="panel-note"></div>
             </div>
             <div class="table-wrap">
@@ -318,7 +318,7 @@
 
           <section class="panel">
             <div class="panel-header">
-              <div class="panel-title">Transacoes adicionadas no HTML</div>
+              <div class="panel-title">Lancamentos HTML salvos</div>
               <div class="action-row">
                 <button id="exportManualLayerButton" class="button secondary">Exportar estado JSON</button>
                 <label class="file-control">
@@ -328,18 +328,21 @@
                 <button id="clearManualLayerButton" class="button secondary">Limpar camada local</button>
               </div>
             </div>
-            <div class="panel-body recovery-panel">
-              <div class="panel-heading">
-                <div class="panel-title">Pontos de recuperacao</div>
-                <div class="panel-subtitle">Backups locais criados manualmente e antes de acoes sensiveis.</div>
+            <details class="support-drawer">
+              <summary>Backup e recuperacao da camada HTML</summary>
+              <div class="recovery-panel">
+                <div class="panel-heading">
+                  <div class="panel-title">Pontos de recuperacao</div>
+                  <div class="panel-subtitle">Backups locais criados manualmente e antes de acoes sensiveis.</div>
+                </div>
+                <div class="recovery-actions">
+                  <button id="createRecoveryButton" class="button secondary">Criar ponto</button>
+                  <button id="downloadRecoveryButton" class="button secondary">Baixar ultimo</button>
+                  <button id="restoreRecoveryButton" class="button secondary">Restaurar ultimo</button>
+                </div>
+                <div id="recoverySummary" class="installment-summary recovery-summary"></div>
               </div>
-              <div class="recovery-actions">
-                <button id="createRecoveryButton" class="button secondary">Criar ponto</button>
-                <button id="downloadRecoveryButton" class="button secondary">Baixar ultimo</button>
-                <button id="restoreRecoveryButton" class="button secondary">Restaurar ultimo</button>
-              </div>
-              <div id="recoverySummary" class="installment-summary recovery-summary"></div>
-            </div>
+            </details>
             <div class="table-wrap ledger-wrap">
               <table id="manualTransactionsTable">
                 <thead>
@@ -398,14 +401,14 @@
 
         <section id="ledgerTab" class="tab-panel">
           <section class="workflow-strip">
-            <div><strong>1</strong><span>Filtre o que sera importado</span></div>
-            <div><strong>2</strong><span>Revise prontos e pendencias</span></div>
+            <div><strong>1</strong><span>Filtre os lancamentos</span></div>
+            <div><strong>2</strong><span>Aprove ou reabra HTML</span></div>
             <div><strong>3</strong><span>Exporte o CSV contabil</span></div>
           </section>
 
           <section class="panel">
             <div class="panel-header">
-              <div class="panel-title">Esteira de lancamentos</div>
+              <div class="panel-title">Esteira contabil</div>
               <div class="action-row">
                 <button id="selectLedgerButton" class="button">Selecionar filtrados</button>
                 <button id="clearLedgerButton" class="button secondary">Limpar selecao</button>
@@ -469,7 +472,7 @@
 
           <section class="panel">
             <div class="panel-header">
-              <div class="panel-title">Previa de importacao</div>
+              <div class="panel-title">Previa do CSV contabil</div>
               <div id="ledgerCount" class="panel-note"></div>
             </div>
             <div class="table-wrap ledger-wrap">
@@ -594,6 +597,12 @@
         </section>
 
         <section id="auditTab" class="tab-panel">
+          <section class="workflow-strip system-strip">
+            <div><strong>1</strong><span>Valide pendencias</span></div>
+            <div><strong>2</strong><span>Confira diario do sistema</span></div>
+            <div><strong>3</strong><span>Revise regras e saldos</span></div>
+          </section>
+
           <section id="operationalSummary" class="control-grid"></section>
 
           <section class="panel">

@@ -349,6 +349,10 @@ button {
   padding: 10px;
 }
 
+.system-strip {
+  border-color: #d8e6ff;
+}
+
 .workflow-strip div {
   align-items: center;
   background: #fbfdff;
@@ -630,11 +634,32 @@ button {
 
 .recovery-panel {
   align-items: start;
-  background: linear-gradient(180deg, #fbfdff 0%, #f8fbff 100%);
-  border-bottom: 1px solid var(--line-soft);
+  background: #fbfdff;
+  border-top: 1px solid var(--line-soft);
   display: grid;
   gap: 12px;
   grid-template-columns: minmax(220px, 0.7fr) auto minmax(0, 1.8fr);
+  padding: 12px;
+}
+
+.support-drawer {
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.support-drawer summary {
+  background: #fbfdff;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  list-style-position: inside;
+  padding: 11px 14px;
+  text-transform: uppercase;
+}
+
+.support-drawer[open] summary {
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--ink);
 }
 
 .recovery-actions {
