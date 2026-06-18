@@ -131,6 +131,7 @@ const els = {
   clearInstallmentSelectionButton: document.querySelector("#clearInstallmentSelectionButton"),
   transactionSimulationTable: document.querySelector("#transactionSimulationTable tbody"),
   transactionSimulationCount: document.querySelector("#transactionSimulationCount"),
+  transactionPreviewSummary: document.querySelector("#transactionPreviewSummary"),
   manualTransactionsTable: document.querySelector("#manualTransactionsTable tbody"),
   exportManualLayerButton: document.querySelector("#exportManualLayerButton"),
   systemStateInput: document.querySelector("#systemStateInput"),
@@ -1616,10 +1617,9 @@ function renderSvgBarChart(container, items, options = {}) {
   const max = Math.max(...values, 1);
   const gradientId = `${container.id || "chart"}Gradient`;
   const greenGradientId = `${container.id || "chart"}GreenGradient`;
-  const labelMode = options.labelMode || (items.length > 10 ? "sparse" : "all");
-  const width = Math.max(820, items.length * 86);
+  const width = Math.max(760, items.length * 70);
   const height = 292;
-  const margin = { top: 42, right: 18, bottom: 44, left: 48 };
+  const margin = { top: 22, right: 18, bottom: 44, left: 54 };
   const chartWidth = width - margin.left - margin.right;
   const chartHeight = height - margin.top - margin.bottom;
   const slot = chartWidth / items.length;
@@ -1635,18 +1635,9 @@ function renderSvgBarChart(container, items, options = {}) {
     const x = margin.left + index * slot + (slot - barWidth) / 2;
     const y = margin.top + chartHeight - barHeight;
     const label = String(item[labelKey] ?? "-");
-    const shouldShowValue = labelMode === "all"
-      || (labelMode === "sparse" && (index % 2 === 0 || value === max || index === items.length - 1))
-      || (labelMode === "peak" && (value === max || index === items.length - 1));
-    const valueLabel = shouldShowValue
-      ? `<text class="svg-value" x="${(x + barWidth / 2).toFixed(2)}" y="${Math.max(16, y - 10).toFixed(2)}">${escapeHtml(valueFormatter(value))}</text>`
-      : "";
-    const count = item.count && shouldShowValue ? `<text class="svg-count" x="${(x + barWidth / 2).toFixed(2)}" y="${Math.max(28, y + 16).toFixed(2)}">${item.count} lanc.</text>` : "";
     return `
       <g class="svg-bar-group">
         <title>${escapeHtml(label)}: ${escapeHtml(preciseFormatter(value))}${item.count ? ` | ${item.count} lancamento(s)` : ""}</title>
-        ${valueLabel}
-        ${count}
         <rect class="svg-bar ${options.tone === "green" ? "svg-bar-green" : ""}" style="fill:url(#${escapeHtml(options.tone === "green" ? greenGradientId : gradientId)})" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barWidth.toFixed(2)}" height="${barHeight.toFixed(2)}" rx="8"></rect>
         <text class="svg-label" x="${(x + barWidth / 2).toFixed(2)}" y="${(height - 16).toFixed(2)}">${escapeHtml(label)}</text>
       </g>
@@ -1667,6 +1658,8 @@ function renderSvgBarChart(container, items, options = {}) {
           </linearGradient>
         </defs>
         <line class="svg-axis-line" x1="${margin.left}" y1="${margin.top + chartHeight}" x2="${width - margin.right}" y2="${margin.top + chartHeight}"></line>
+        <text class="svg-axis-label" x="${margin.left}" y="${margin.top - 6}">${escapeHtml(valueFormatter(max))}</text>
+        <text class="svg-axis-label" x="${margin.left}" y="${margin.top + chartHeight - 6}">0</text>
         ${gridLines}
         ${bars}
       </svg>
@@ -2688,7 +2681,21 @@ function renderPaymentInstallments() {
 
 function renderTransactionSimulation() {
   const rows = state.transactionDraftEntries;
+  const amount = sum(rows, (entry) => entry.amount);
+  const review = rows.filter((entry) => entry.reviewStatus !== "pronto").length;
+  const accounts = new Set(rows.flatMap((entry) => [entry.debit, entry.credit]).filter(Boolean));
   els.transactionSimulationCount.textContent = `${rows.length} lancamento(s) simulados`;
+  els.transactionPreviewSummary.innerHTML = rows.length ? `
+    <div><span>Valor simulado</span><strong title="${fmtMoney(amount, true)}">${fmtMoneyCompact(amount)}</strong></div>
+    <div><span>Linhas</span><strong>${rows.length}</strong></div>
+    <div><span>Revisao</span><strong>${review ? `${review} revisar` : "Pronto"}</strong></div>
+    <div><span>Contas</span><strong>${accounts.size}</strong></div>
+  ` : `
+    <div><span>Status</span><strong>Aguardando simulacao</strong></div>
+    <div><span>Valor</span><strong>R$ 0</strong></div>
+    <div><span>Linhas</span><strong>0</strong></div>
+    <div><span>Contas</span><strong>0</strong></div>
+  `;
   els.transactionSimulationTable.innerHTML = rows.map((entry) => ledgerRowCells(entry, false)).join("")
     || `<tr><td colspan="9" class="empty-cell">Preencha os dados e clique em Simular.</td></tr>`;
 }

@@ -999,6 +999,37 @@ button:disabled {
   text-overflow: ellipsis;
 }
 
+.transaction-preview-summary {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border-bottom: 1px solid var(--border-soft);
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: var(--space-6) var(--space-10);
+}
+
+.transaction-preview-summary div {
+  background: #ffffff;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  display: grid;
+  gap: var(--space-1);
+  min-height: 62px;
+  padding: var(--space-4);
+}
+
+.transaction-preview-summary span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.transaction-preview-summary strong {
+  color: var(--ink);
+  font-size: 16px;
+}
+
 .installment-summary {
   display: grid;
   gap: var(--space-6);
@@ -1106,7 +1137,7 @@ button:disabled {
 
 .svg-bar-chart {
   display: block;
-  min-width: 760px;
+  min-width: 700px;
   width: 100%;
 }
 
@@ -1130,25 +1161,18 @@ button:disabled {
   opacity: 0.82;
 }
 
-.svg-value {
-  fill: var(--ink);
-  font-size: 10px;
-  font-weight: 750;
-  text-anchor: middle;
-}
-
-.svg-count {
-  fill: var(--muted);
-  font-size: 9px;
-  font-weight: 700;
-  text-anchor: middle;
-}
-
 .svg-label {
   fill: var(--muted);
   font-size: 10px;
   font-weight: 650;
   text-anchor: middle;
+}
+
+.svg-axis-label {
+  fill: #94a3b8;
+  font-size: 10px;
+  font-weight: 700;
+  text-anchor: start;
 }
 
 .bar-wrap {
@@ -1553,6 +1577,8 @@ td:last-child {
   max-width: 520px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: normal;
+  min-width: 260px;
 }
 
 tr[data-selected="true"] {
@@ -1574,9 +1600,34 @@ tbody tr:hover {
 }
 
 td:nth-child(6),
-td:nth-child(7),
-td:nth-child(8) {
+td:nth-child(7) {
   font-variant-numeric: tabular-nums;
+}
+
+#contractsTable th:nth-child(6),
+#contractsTable th:nth-child(7),
+#contractsTable td:nth-child(6),
+#contractsTable td:nth-child(7),
+#ledgerTable th:nth-child(8),
+#ledgerTable td:nth-child(8),
+#transactionSimulationTable th:nth-child(7),
+#transactionSimulationTable td:nth-child(7),
+#manualTransactionsTable th:nth-child(7),
+#manualTransactionsTable td:nth-child(7),
+#batchImportTable th:nth-child(5),
+#batchImportTable td:nth-child(5),
+#paymentInstallmentsTable th:nth-child(4),
+#paymentInstallmentsTable th:nth-child(5),
+#paymentInstallmentsTable th:nth-child(6),
+#paymentInstallmentsTable td:nth-child(4),
+#paymentInstallmentsTable td:nth-child(5),
+#paymentInstallmentsTable td:nth-child(6) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+td:has(.pill) {
+  text-align: left;
 }
 
 .pill {
@@ -2118,7 +2169,10 @@ td:nth-child(8) {
 
 .empty-state {
   color: var(--muted);
-  padding: 28px;
+  background: #f8fbff;
+  border: 1px dashed var(--border-soft);
+  border-radius: var(--radius-lg);
+  padding: var(--space-12);
   text-align: center;
 }
 
@@ -2309,6 +2363,7 @@ td:nth-child(8) {
   .transaction-form,
   .contract-editor-grid,
   .snapshot-grid,
+  .transaction-preview-summary,
   .contract-metrics,
   .installment-summary,
   .audit-event-summary {
