@@ -35,6 +35,11 @@ const preciseCurrency = new Intl.NumberFormat("pt-BR", {
   minimumFractionDigits: 2,
 });
 
+const decimalCompact = new Intl.NumberFormat("pt-BR", {
+  maximumFractionDigits: 2,
+  minimumFractionDigits: 0,
+});
+
 const els = {
   status: document.querySelector("#statusLine"),
   fileInput: document.querySelector("#fileInput"),
@@ -152,6 +157,15 @@ function escapeHtml(value) {
 
 function fmtMoney(value, precise = false) {
   return (precise ? preciseCurrency : currency).format(value || 0);
+}
+
+function fmtMoneyCompact(value) {
+  const amount = Number(value || 0);
+  const abs = Math.abs(amount);
+  if (abs >= 1_000_000_000) return `R$ ${decimalCompact.format(amount / 1_000_000_000)} bi`;
+  if (abs >= 1_000_000) return `R$ ${decimalCompact.format(amount / 1_000_000)} mi`;
+  if (abs >= 1_000) return `R$ ${decimalCompact.format(amount / 1_000)} mil`;
+  return preciseCurrency.format(amount);
 }
 
 function fmtDateBr(date) {
@@ -1380,8 +1394,8 @@ function renderKpis() {
     ["Contratos", contracts.length],
     ["Ativos", contracts.filter((contract) => contract.status === "ativo").length],
     ["Quitados", contracts.filter((contract) => contract.status === "quitado").length],
-    ["Divida final", fmtMoney(sum(contracts, (contract) => contract.balances.finalDebt))],
-    ["Juros no ano", fmtMoney(interest)],
+    ["Divida final", fmtMoneyCompact(sum(contracts, (contract) => contract.balances.finalDebt))],
+    ["Juros no ano", fmtMoneyCompact(interest)],
     ["Lancamentos filtrados", entries.length],
     ["Transacoes HTML", manualEntries.length],
   ];
@@ -1422,8 +1436,8 @@ function renderPanelSummary() {
   els.panelSummary.innerHTML = `
     <div class="summary-hero">
       <span>Saldo atualizado no sistema</span>
-      <strong>${fmtMoney(finalDebt, true)}</strong>
-      <small>${principalImpact <= 0 ? "Reducao" : "Aumento"} pela camada HTML: ${fmtMoney(Math.abs(principalImpact), true)}</small>
+      <strong title="${fmtMoney(finalDebt, true)}">${fmtMoneyCompact(finalDebt)}</strong>
+      <small>${principalImpact <= 0 ? "Reducao" : "Aumento"} pela camada HTML: ${fmtMoneyCompact(Math.abs(principalImpact))}</small>
     </div>
     <div class="summary-tile">
       <span>Parcelas pendentes</span>
@@ -1431,12 +1445,12 @@ function renderPanelSummary() {
     </div>
     <div class="summary-tile">
       <span>Fluxo filtrado</span>
-      <strong>${fmtMoney(ledgerAmount)}</strong>
+      <strong title="${fmtMoney(ledgerAmount, true)}">${fmtMoneyCompact(ledgerAmount)}</strong>
       <small>${entries.length} lancamento(s)</small>
     </div>
     <div class="summary-tile">
       <span>Juros / revisar</span>
-      <strong>${fmtMoney(interestAmount)}</strong>
+      <strong title="${fmtMoney(interestAmount, true)}">${fmtMoneyCompact(interestAmount)}</strong>
       <small>${manualEntries.length} HTML | ${reviewCount} revisar</small>
     </div>
   `;
@@ -1460,7 +1474,7 @@ function renderMonthlyChart() {
     const height = Math.max(3, (item.amount / max) * 100);
     return `
       <div class="bar-wrap" title="${escapeHtml(item.label)}: ${fmtMoney(item.amount, true)}">
-        <div class="bar-value">${fmtMoney(item.amount)}</div>
+        <div class="bar-value">${fmtMoneyCompact(item.amount)}</div>
         <div class="bar" style="height:${height}%"></div>
         <div class="bar-label">${escapeHtml(item.display)}</div>
       </div>
@@ -1483,13 +1497,13 @@ function renderDebtSplit() {
       <div class="donut" style="background: conic-gradient(var(--blue) 0 ${currentPct}%, var(--green) ${currentPct}% 100%)">
         <div>
           <span>Total</span>
-          <strong>${fmtMoney(total)}</strong>
+          <strong>${fmtMoneyCompact(total)}</strong>
         </div>
       </div>
       <div class="split-legend">
-        <div><span class="dot current"></span> Circulante <strong>${fmtMoney(current, true)}</strong> <em>${currentPct.toFixed(1).replace(".", ",")}%</em></div>
-        <div><span class="dot non-current"></span> Nao circulante <strong>${fmtMoney(nonCurrent, true)}</strong> <em>${nonCurrentPct.toFixed(1).replace(".", ",")}%</em></div>
-        <div><span class="dot amber"></span> Juros no filtro <strong>${fmtMoney(interest, true)}</strong></div>
+        <div><span class="dot current"></span> Circulante <strong title="${fmtMoney(current, true)}">${fmtMoneyCompact(current)}</strong> <em>${currentPct.toFixed(1).replace(".", ",")}%</em></div>
+        <div><span class="dot non-current"></span> Nao circulante <strong title="${fmtMoney(nonCurrent, true)}">${fmtMoneyCompact(nonCurrent)}</strong> <em>${nonCurrentPct.toFixed(1).replace(".", ",")}%</em></div>
+        <div><span class="dot amber"></span> Juros no filtro <strong title="${fmtMoney(interest, true)}">${fmtMoneyCompact(interest)}</strong></div>
       </div>
     </div>
   `;
@@ -1587,7 +1601,7 @@ function renderRankChart(container, items, options = {}) {
     container.innerHTML = `<div class="empty-state">Sem dados no filtro atual.</div>`;
     return;
   }
-  const valueFormatter = options.valueFormatter || ((value) => fmtMoney(value));
+  const valueFormatter = options.valueFormatter || ((value) => fmtMoneyCompact(value));
   const max = Math.max(...items.map((item) => item.value), 1);
   container.innerHTML = items.map((item) => `
     <button class="rank-row ${options.clickable ? "rank-clickable" : ""}" type="button" ${options.clickable && item.id ? `data-contract-id="${item.id}"` : ""}>
@@ -1598,7 +1612,7 @@ function renderRankChart(container, items, options = {}) {
       <div class="rank-track">
         <div class="rank-bar" style="width:${Math.max(2, (item.value / max) * 100)}%"></div>
       </div>
-      <div class="rank-value">${escapeHtml(valueFormatter(item.value))}</div>
+      <div class="rank-value" title="${escapeHtml(fmtMoney(item.value, true))}">${escapeHtml(valueFormatter(item.value))}</div>
     </button>
   `).join("");
   if (options.clickable) {
@@ -1978,7 +1992,7 @@ function renderLedgerKpis() {
     ["Exportados", exported],
     ["Nao export.", notExported],
     ["Selecionados", selectedEntries.length],
-    ["Valor selecionado", fmtMoney(selectedAmount)],
+    ["Valor selecionado", fmtMoneyCompact(selectedAmount)],
   ];
   els.ledgerKpis.innerHTML = items.map(([label, value]) => `
     <section class="kpi">
@@ -2038,7 +2052,7 @@ function renderLedgerExportReadiness() {
       <div class="export-readiness-metrics">
         <div><span>Lancamentos</span><strong>${snapshot.entries.length}</strong></div>
         <div><span>Contratos</span><strong>${snapshot.contracts}</strong></div>
-        <div><span>Valor</span><strong>${fmtMoney(snapshot.amount)}</strong></div>
+        <div><span>Valor</span><strong title="${fmtMoney(snapshot.amount, true)}">${fmtMoneyCompact(snapshot.amount)}</strong></div>
         <div><span>Ja exportados</span><strong>${snapshot.exported.length}</strong></div>
       </div>
     </section>
@@ -2883,7 +2897,7 @@ function renderBatchImport() {
     <div class="summary-metric"><span>Com erro</span><strong>${rows.length - validRows.length}</strong></div>
     <div class="summary-metric"><span>Lancamentos</span><strong>${entries.length}</strong></div>
     <div class="summary-metric"><span>A revisar</span><strong>${entries.filter((entry) => entry.reviewStatus === "revisar").length}</strong></div>
-    <div class="summary-metric"><span>Valor</span><strong>${fmtMoney(sum(entries, (entry) => entry.amount), true)}</strong></div>
+    <div class="summary-metric"><span>Valor</span><strong title="${fmtMoney(sum(entries, (entry) => entry.amount), true)}">${fmtMoneyCompact(sum(entries, (entry) => entry.amount))}</strong></div>
   `;
   els.batchImportTable.innerHTML = rows.map((row) => `
     <tr class="${row.status === "erro" ? "batch-error" : ""}">
