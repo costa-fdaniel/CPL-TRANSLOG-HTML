@@ -1,23 +1,23 @@
 :root {
   color-scheme: light;
-  --bg: #f3f6fa;
+  --bg: #eef3f8;
   --surface: #ffffff;
-  --surface-2: #f1f5f9;
-  --text: #17202a;
-  --muted: #64748b;
-  --line: #d6dee8;
-  --line-soft: #e8edf3;
-  --blue: #225bd8;
-  --blue-soft: #eaf1ff;
-  --green: #0f766e;
-  --green-soft: #e8f6f1;
+  --surface-2: #f6f8fb;
+  --text: #1f2a37;
+  --muted: #667085;
+  --line: #d5deea;
+  --line-soft: #edf1f6;
+  --blue: #1f5fbf;
+  --blue-soft: #edf4ff;
+  --green: #08756f;
+  --green-soft: #e9f7f3;
   --red: #b42318;
   --red-soft: #fff1f1;
-  --amber: #b45309;
+  --amber: #a35a00;
   --amber-soft: #fff7e8;
-  --ink: #0f172a;
-  --shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
-  --shadow-soft: 0 4px 14px rgba(15, 23, 42, 0.04);
+  --ink: #101828;
+  --shadow: 0 14px 36px rgba(16, 24, 40, 0.08);
+  --shadow-soft: 0 8px 22px rgba(16, 24, 40, 0.055);
 }
 
 * {
@@ -27,7 +27,7 @@
 body {
   margin: 0;
   background:
-    linear-gradient(180deg, #ffffff 0, var(--bg) 168px),
+    linear-gradient(180deg, #ffffff 0, #f8fbff 180px, var(--bg) 420px),
     var(--bg);
   color: var(--text);
   font-family: "Segoe UI", Arial, sans-serif;
@@ -43,14 +43,25 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+* {
+  scrollbar-color: #c7d4e5 transparent;
+  scrollbar-width: thin;
+}
+
 .app-shell {
   min-height: 100vh;
 }
 
 .topbar {
-  background: var(--surface);
-  border-bottom: 1px solid var(--line-soft);
-  padding: 14px 24px;
+  background: rgba(255, 255, 255, 0.94);
+  border-bottom: 1px solid rgba(213, 222, 234, 0.8);
+  box-shadow: 0 2px 16px rgba(16, 24, 40, 0.045);
+  padding: 12px 24px;
   position: sticky;
   top: 0;
   z-index: 5;
@@ -72,7 +83,7 @@ button {
 
 .brand-title {
   color: var(--ink);
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 800;
   letter-spacing: 0;
 }
@@ -92,8 +103,8 @@ button {
 
 .global-filter-bar,
 .panel-filter-bar {
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--line-soft);
   border-radius: 8px;
   box-shadow: var(--shadow-soft);
   display: grid;
@@ -119,7 +130,7 @@ button {
 .operator-control,
 .button {
   align-items: center;
-  background: var(--surface-2);
+  background: #f8fafc;
   border: 1px solid var(--line);
   border-radius: 6px;
   color: var(--text);
@@ -128,7 +139,8 @@ button {
   min-height: 38px;
   padding: 0 12px;
   text-decoration: none;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  font-weight: 650;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
 
 .operator-control {
@@ -151,19 +163,27 @@ button {
   outline: 0;
 }
 
+.operator-control:focus-within {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(31, 95, 191, 0.12);
+}
+
 .button:hover,
 .file-control:hover {
-  background: #e8eef6;
+  background: #eef4fb;
+  border-color: #c7d4e5;
+  box-shadow: 0 3px 10px rgba(16, 24, 40, 0.06);
 }
 
 .button.primary {
   background: var(--blue);
   border-color: var(--blue);
   color: #ffffff;
+  box-shadow: 0 8px 18px rgba(31, 95, 191, 0.22);
 }
 
 .button.primary:hover {
-  background: #174bb8;
+  background: #174f9f;
 }
 
 .button.secondary {
@@ -181,6 +201,7 @@ button {
   border-radius: 6px;
   min-height: 38px;
   padding: 0 10px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .select:focus,
@@ -196,10 +217,10 @@ button {
 
 .content {
   display: grid;
-  gap: 16px;
+  gap: 18px;
   margin: 0 auto;
-  max-width: 1560px;
-  padding: 18px 24px 36px;
+  max-width: 1540px;
+  padding: 20px 24px 40px;
 }
 
 .status-line,
@@ -210,8 +231,8 @@ button {
 
 .tabs {
   align-items: center;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--line-soft);
   border-radius: 8px;
   box-shadow: var(--shadow-soft);
   display: flex;
@@ -225,13 +246,14 @@ button {
   border: 0;
   border-radius: 6px;
   color: var(--muted);
-  font-weight: 600;
-  min-height: 34px;
-  padding: 0 14px;
+  font-weight: 700;
+  min-height: 36px;
+  padding: 0 16px;
 }
 
 .tab-button.active {
-  background: var(--ink);
+  background: var(--blue);
+  box-shadow: 0 8px 18px rgba(31, 95, 191, 0.18);
   color: #ffffff;
 }
 
@@ -241,7 +263,7 @@ button {
 
 .tab-panel.active {
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 
 .kpi-grid {
@@ -255,25 +277,25 @@ button {
 }
 
 .kpi {
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  border: 1px solid var(--line-soft);
   border-radius: 8px;
   box-shadow: var(--shadow-soft);
   min-height: 82px;
-  padding: 13px 14px;
+  padding: 14px 15px;
 }
 
 .kpi-label {
   color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 800;
   margin-bottom: 8px;
   text-transform: uppercase;
 }
 
 .kpi-value {
   color: var(--ink);
-  font-size: 21px;
+  font-size: 22px;
   font-weight: 800;
   line-height: 1.1;
 }
@@ -291,8 +313,8 @@ button {
 
 .summary-hero,
 .summary-tile {
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  border: 1px solid var(--line-soft);
   border-radius: 8px;
   box-shadow: var(--shadow-soft);
   display: grid;
@@ -302,8 +324,8 @@ button {
 }
 
 .summary-hero {
-  background: linear-gradient(135deg, #ffffff 0%, var(--green-soft) 100%);
-  border-color: #cfe7e1;
+  background: linear-gradient(135deg, #ffffff 0%, #eefaf6 100%);
+  border-color: #cce8df;
 }
 
 .summary-hero span,
@@ -339,8 +361,8 @@ button {
 }
 
 .workflow-strip {
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--line-soft);
   border-radius: 8px;
   box-shadow: var(--shadow-soft);
   display: grid;
@@ -355,7 +377,7 @@ button {
 
 .workflow-strip div {
   align-items: center;
-  background: #fbfdff;
+  background: #ffffff;
   border: 1px solid var(--line-soft);
   border-radius: 6px;
   display: flex;
@@ -366,7 +388,7 @@ button {
 
 .workflow-strip strong {
   align-items: center;
-  background: var(--blue);
+  background: #143b73;
   border-radius: 999px;
   color: #ffffff;
   display: inline-flex;
@@ -457,7 +479,7 @@ button {
 .panel {
   align-self: start;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-soft);
   border-radius: 8px;
   box-shadow: var(--shadow-soft);
   min-width: 0;
@@ -470,13 +492,13 @@ button {
 
 .panel-header {
   align-items: center;
-  background: #fbfdff;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
   border-bottom: 1px solid var(--line-soft);
   display: flex;
   gap: 12px;
   justify-content: space-between;
-  min-height: 48px;
-  padding: 0 14px;
+  min-height: 50px;
+  padding: 0 16px;
 }
 
 .panel-actions {
@@ -510,7 +532,7 @@ button {
 
 .panel-body {
   min-height: 0;
-  padding: 12px 14px 14px;
+  padding: 14px 16px 16px;
 }
 
 .filter-grid {
@@ -585,7 +607,7 @@ button {
 }
 
 .explanation-box {
-  background: #fbfdff;
+  background: #f8fbff;
   border: 1px solid var(--line-soft);
   border-radius: 8px;
   color: var(--text);
@@ -606,7 +628,7 @@ button {
 }
 
 .snapshot-grid div {
-  background: #f7fafc;
+  background: #f8fbff;
   border: 1px solid var(--line-soft);
   border-radius: 6px;
   display: grid;
@@ -634,7 +656,7 @@ button {
 
 .recovery-panel {
   align-items: start;
-  background: #fbfdff;
+  background: #f8fbff;
   border-top: 1px solid var(--line-soft);
   display: grid;
   gap: 12px;
@@ -647,7 +669,7 @@ button {
 }
 
 .support-drawer summary {
-  background: #fbfdff;
+  background: #f8fbff;
   color: var(--muted);
   cursor: pointer;
   font-size: 12px;
@@ -674,7 +696,7 @@ button {
 }
 
 .summary-metric {
-  background: #fbfdff;
+  background: #ffffff;
   border: 1px solid var(--line-soft);
   border-radius: 6px;
   display: grid;
@@ -937,7 +959,7 @@ button {
 }
 
 .rank-clickable:hover {
-  background: #f7fafc;
+  background: #f3f8ff;
 }
 
 .rank-label,
@@ -972,14 +994,14 @@ button {
 }
 
 .rank-track {
-  background: var(--surface-2);
+  background: #edf2f7;
   border-radius: 999px;
   height: 10px;
   overflow: hidden;
 }
 
 .rank-bar {
-  background: var(--blue);
+  background: linear-gradient(90deg, #1f5fbf 0%, #3777de 100%);
   border-radius: inherit;
   height: 100%;
 }
@@ -1032,6 +1054,7 @@ button {
 }
 
 .table-wrap {
+  background: #ffffff;
   overflow: auto;
 }
 
@@ -1048,19 +1071,20 @@ th,
 td {
   border-bottom: 1px solid var(--line-soft);
   font-size: 12px;
-  padding: 8px 10px;
+  padding: 9px 12px;
   text-align: left;
   vertical-align: top;
   white-space: nowrap;
 }
 
 th {
-  background: #f8fbff;
+  background: #f5f8fc;
   color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 800;
   position: sticky;
   top: 0;
+  text-transform: uppercase;
   z-index: 1;
 }
 
@@ -1071,23 +1095,28 @@ td:last-child {
 }
 
 tr[data-selected="true"] {
-  background: var(--blue-soft);
+  background: #edf4ff;
 }
 
 .manual-row {
-  background: #f2fbf8;
+  background: #f4fbf8;
+}
+
+tbody tr:nth-child(even):not([data-selected="true"]) {
+  background: #fcfdff;
 }
 
 tbody tr:hover {
-  background: #f8fbff;
+  background: #f3f8ff;
 }
 
 .pill {
   border-radius: 999px;
   display: inline-flex;
   font-size: 11px;
-  font-weight: 700;
-  padding: 3px 7px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 5px 8px;
 }
 
 .pill-active {
@@ -1143,8 +1172,8 @@ tbody tr:hover {
 }
 
 .control-card {
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  border: 1px solid var(--line-soft);
   border-radius: 8px;
   box-shadow: var(--shadow-soft);
   display: grid;
@@ -1246,7 +1275,8 @@ tbody tr:hover {
 
 .validation-item {
   align-items: start;
-  border: 1px solid var(--line);
+  background: #ffffff;
+  border: 1px solid var(--line-soft);
   border-radius: 7px;
   display: grid;
   gap: 10px;
@@ -1316,7 +1346,7 @@ tbody tr:hover {
 }
 
 .contract-id-box {
-  background: linear-gradient(135deg, #fbfdff 0%, var(--blue-soft) 100%);
+  background: linear-gradient(135deg, #ffffff 0%, var(--blue-soft) 100%);
   border: 1px solid #d8e6ff;
   border-radius: 8px;
   display: grid;
@@ -1352,7 +1382,7 @@ tbody tr:hover {
 }
 
 .contract-metrics div {
-  background: #fbfdff;
+  background: #ffffff;
   border: 1px solid var(--line-soft);
   border-radius: 7px;
   display: grid;
@@ -1372,7 +1402,7 @@ tbody tr:hover {
 }
 
 .installment-progress-block {
-  background: #fbfdff;
+  background: #ffffff;
   border: 1px solid var(--line-soft);
   border-radius: 7px;
   display: grid;
@@ -1410,7 +1440,7 @@ tbody tr:hover {
 }
 
 .accounts-box {
-  background: #fbfdff;
+  background: #f8fbff;
   border: 1px solid #dbeafe;
   border-radius: 8px;
   display: grid;
@@ -1496,7 +1526,7 @@ tbody tr:hover {
 }
 
 .audit-summary-card {
-  background: #fbfdff;
+  background: #ffffff;
   border: 1px solid var(--line-soft);
   border-radius: 7px;
   display: grid;
@@ -1526,7 +1556,7 @@ tbody tr:hover {
 
 .audit-event {
   align-items: center;
-  background: #fbfdff;
+  background: #ffffff;
   border: 1px solid var(--line-soft);
   border-left: 4px solid var(--muted);
   border-radius: 7px;
@@ -1576,7 +1606,7 @@ tbody tr:hover {
 .audit-item {
   border: 1px solid var(--line);
   border-radius: 7px;
-  background: #fbfdff;
+  background: #ffffff;
   padding: 10px;
 }
 
