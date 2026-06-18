@@ -780,8 +780,9 @@ button:disabled {
 }
 
 .ledger-month-panel .compact-chart {
-  height: 210px;
-  overflow: hidden;
+  height: auto;
+  min-height: 260px;
+  overflow: visible;
   padding-top: 0;
 }
 
@@ -1082,22 +1083,24 @@ button:disabled {
 }
 
 .chart {
-  display: flex;
+  display: block;
   gap: var(--space-5);
-  height: 250px;
+  height: auto;
+  min-height: 300px;
   overflow-x: auto;
   padding: var(--space-5) var(--space-1) 0;
 }
 
 .chart.compact-chart {
-  height: 220px;
+  height: auto;
+  min-height: 260px;
 }
 
 .svg-chart-shell {
-  display: grid;
-  gap: var(--space-4);
+  display: block;
   min-width: 100%;
   overflow-x: auto;
+  overflow-y: hidden;
   padding: var(--space-2) 0 0;
 }
 
@@ -1146,28 +1149,6 @@ button:disabled {
   font-size: 10px;
   font-weight: 650;
   text-anchor: middle;
-}
-
-.chart-summary-strip {
-  display: grid;
-  gap: var(--space-3);
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.chart-summary-strip span {
-  background: #f8fbff;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-sm);
-  color: var(--muted);
-  display: grid;
-  gap: var(--space-1);
-  min-height: 54px;
-  padding: var(--space-3) var(--space-4);
-}
-
-.chart-summary-strip strong {
-  color: var(--ink);
-  font-size: 13px;
 }
 
 .bar-wrap {
@@ -2309,10 +2290,6 @@ td:nth-child(8) {
   }
 
   .action-catalog {
-    grid-template-columns: 1fr;
-  }
-
-  .chart-summary-strip {
     grid-template-columns: 1fr;
   }
 

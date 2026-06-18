@@ -1614,8 +1614,6 @@ function renderSvgBarChart(container, items, options = {}) {
   const preciseFormatter = options.preciseFormatter || ((value) => fmtMoney(value, true));
   const values = items.map((item) => Math.max(0, Number(item[valueKey]) || 0));
   const max = Math.max(...values, 1);
-  const total = sum(items, (item) => Number(item[valueKey]) || 0);
-  const peak = items[values.indexOf(max)] || items[0];
   const gradientId = `${container.id || "chart"}Gradient`;
   const greenGradientId = `${container.id || "chart"}GreenGradient`;
   const labelMode = options.labelMode || (items.length > 10 ? "sparse" : "all");
@@ -1672,11 +1670,6 @@ function renderSvgBarChart(container, items, options = {}) {
         ${gridLines}
         ${bars}
       </svg>
-      <div class="chart-summary-strip">
-        <span>Total <strong>${escapeHtml(valueFormatter(total))}</strong></span>
-        <span>Pico <strong>${escapeHtml(peak[labelKey] ?? "-")}</strong></span>
-        <span>Media <strong>${escapeHtml(valueFormatter(total / Math.max(items.length, 1)))}</strong></span>
-      </div>
     </div>
   `;
 }
