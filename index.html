@@ -392,6 +392,8 @@
               <div class="action-row">
                 <button id="selectLedgerButton" class="button">Selecionar filtrados</button>
                 <button id="clearLedgerButton" class="button secondary">Limpar selecao</button>
+                <button id="approveLedgerButton" class="button secondary">Aprovar</button>
+                <button id="reopenLedgerButton" class="button secondary">Reabrir</button>
                 <button id="exportLedgerButton" class="button primary">Exportar CSV</button>
               </div>
             </div>
@@ -406,6 +408,13 @@
                   <option value="pronto">Prontos</option>
                   <option value="revisar">Revisar</option>
                   <option value="all">Todos</option>
+                </select>
+                <select id="ledgerFlowFilter" class="select" aria-label="Fluxo">
+                  <option value="not_exported">Nao exportados</option>
+                  <option value="approved">Aprovados</option>
+                  <option value="draft">Rascunho</option>
+                  <option value="exported">Exportados</option>
+                  <option value="all">Todos os fluxos</option>
                 </select>
                 <input id="ledgerSearchInput" class="search" type="search" placeholder="Buscar conta, descricao ou regra">
               </div>

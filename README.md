@@ -86,7 +86,16 @@ As colunas de lancamento sao identificadas pelo cabecalho de cada aba. Quando um
 5. Confira a explicacao e a simulacao dos debitos/creditos.
 6. Clique em `Adicionar a esteira`.
 7. O Painel, a aba Contratos e o detalhe do contrato passam a refletir o saldo ajustado pela camada HTML.
-8. Use a aba `Lancamentos` para filtrar, selecionar e exportar o CSV contabil.
+8. Use a aba `Lancamentos` para filtrar e selecionar os lancamentos HTML.
+9. Clique em `Aprovar` para liberar os lancamentos revisados.
+10. Exporte o CSV contabil. Lancamentos HTML ainda em rascunho/revisao nao sao exportados.
+
+Na esteira existem dois conceitos separados:
+
+- `Situacao`: validacao contabil do lancamento (`pronto` ou `revisar`).
+- `Fluxo`: etapa operacional (`rascunho`, `aprovado` ou `exportado`).
+
+O botao `Reabrir` volta lancamentos HTML selecionados para revisao operacional. A exportacao marca os lancamentos HTML exportados com lote, data e status `exportado`.
 
 ## Leitura do painel
 

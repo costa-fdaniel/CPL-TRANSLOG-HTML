@@ -1022,6 +1022,11 @@ tbody tr:hover {
   color: var(--muted);
 }
 
+.pill-approved {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
 .pill-warning {
   background: var(--amber-soft);
   color: var(--amber);
@@ -1046,6 +1051,10 @@ tbody tr:hover {
   color: var(--muted);
   display: block;
   font-size: 11px;
+  margin-top: 4px;
+}
+
+.op-pill {
   margin-top: 4px;
 }
 

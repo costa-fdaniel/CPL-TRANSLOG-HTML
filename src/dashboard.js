@@ -79,9 +79,12 @@ const els = {
   ledgerContractFilter: document.querySelector("#ledgerContractFilter"),
   ledgerRuleFilter: document.querySelector("#ledgerRuleFilter"),
   ledgerReadyFilter: document.querySelector("#ledgerReadyFilter"),
+  ledgerFlowFilter: document.querySelector("#ledgerFlowFilter"),
   ledgerSearch: document.querySelector("#ledgerSearchInput"),
   selectLedgerButton: document.querySelector("#selectLedgerButton"),
   clearLedgerButton: document.querySelector("#clearLedgerButton"),
+  approveLedgerButton: document.querySelector("#approveLedgerButton"),
+  reopenLedgerButton: document.querySelector("#reopenLedgerButton"),
   exportLedgerButton: document.querySelector("#exportLedgerButton"),
   toggleVisibleLedger: document.querySelector("#toggleVisibleLedger"),
   ledgerMonthChart: document.querySelector("#ledgerMonthChart"),
@@ -1021,6 +1024,7 @@ function applyLedgerFilters() {
   const contractId = els.ledgerContractFilter.value;
   const rule = els.ledgerRuleFilter.value;
   const ready = els.ledgerReadyFilter.value;
+  const flow = els.ledgerFlowFilter.value;
   const dateFrom = els.ledgerDateFrom.value;
   const dateTo = els.ledgerDateTo.value;
   const term = els.ledgerSearch.value.trim().toLowerCase();
@@ -1032,6 +1036,15 @@ function applyLedgerFilters() {
     .filter((entry) => contractId === "all" || String(entry.contractId) === contractId)
     .filter((entry) => rule === "all" || entry.rule === rule)
     .filter((entry) => ready === "all" || entry.reviewStatus === ready)
+    .filter((entry) => {
+      const status = entry.operationStatus || (entry.origin === "manual" ? "rascunho" : "historico");
+      if (flow === "all") return true;
+      if (flow === "not_exported") return status !== "exportado";
+      if (flow === "exported") return status === "exportado";
+      if (flow === "approved") return status === "aprovado";
+      if (flow === "draft") return ["rascunho", "pronto", "revisar"].includes(status);
+      return true;
+    })
     .filter((entry) => !dateFrom || entry.date >= dateFrom)
     .filter((entry) => !dateTo || entry.date <= dateTo)
     .filter((entry) => {
@@ -1613,7 +1626,7 @@ function renderOperationalControl() {
       <td>${entry.contractId} - ${escapeHtml(entry.contractNumber)}</td>
       <td>${escapeHtml(entry.rule)}</td>
       <td>
-        <span class="pill ${entry.operationStatus === "exportado" ? "pill-active" : entry.reviewStatus === "pronto" ? "pill-settled" : "pill-warning"}">
+        <span class="pill ${operationStatusClass(entry.operationStatus || "rascunho")}">
           ${escapeHtml(entry.operationStatus || entry.reviewStatus)}
         </span>
       </td>
@@ -1653,12 +1666,17 @@ function renderLedgerKpis() {
   const selectedEntries = entries.filter((entry) => state.selectedLedgerIds.has(entry.id));
   const ready = entries.filter((entry) => entry.reviewStatus === "pronto").length;
   const review = entries.length - ready;
+  const approved = entries.filter((entry) => entry.operationStatus === "aprovado").length;
+  const exported = entries.filter((entry) => entry.operationStatus === "exportado").length;
+  const notExported = entries.filter((entry) => entry.operationStatus !== "exportado").length;
   const selectedAmount = sum(selectedEntries, (entry) => entry.amount);
   const items = [
     ["Lancamentos", entries.length],
     ["Prontos", ready],
     ["A revisar", review],
-    ["Total filtrado", fmtMoney(sum(entries, (entry) => entry.amount))],
+    ["Aprovados", approved],
+    ["Exportados", exported],
+    ["Nao export.", notExported],
     ["Selecionados", selectedEntries.length],
     ["Valor selecionado", fmtMoney(selectedAmount)],
   ];
@@ -2519,7 +2537,7 @@ function ledgerRowCells(entry, withCheck = true) {
       <td>${fmtMoney(entry.amount, true)}</td>
       <td>
         <span class="pill ${entry.reviewStatus === "pronto" ? "pill-active" : "pill-warning"}">${escapeHtml(entry.reviewStatus)}</span>
-        ${entry.origin === "manual" ? `<span class="op-status">${escapeHtml(entry.operationStatus || "rascunho")}</span>` : ""}
+        ${entry.origin === "manual" ? `<span class="pill ${operationStatusClass(entry.operationStatus || "rascunho")} op-pill">${escapeHtml(entry.operationStatus || "rascunho")}</span>` : ""}
       </td>
       <td>${escapeHtml(entry.description)}</td>
     </tr>
@@ -2529,6 +2547,61 @@ function ledgerRowCells(entry, withCheck = true) {
 function selectedLedgerForExport() {
   const selected = state.filteredLedger.filter((entry) => state.selectedLedgerIds.has(entry.id));
   return selected.length ? selected : state.filteredLedger;
+}
+
+function selectedManualEntries() {
+  const selectedIds = new Set(state.filteredLedger
+    .filter((entry) => state.selectedLedgerIds.has(entry.id))
+    .map((entry) => entry.id));
+  return state.manualEntries.filter((entry) => selectedIds.has(entry.id));
+}
+
+function operationStatusClass(status) {
+  if (status === "exportado") return "pill-active";
+  if (status === "aprovado") return "pill-approved";
+  if (status === "revisar") return "pill-warning";
+  return "pill-settled";
+}
+
+function postAuditEvent(eventType, refId, payload) {
+  if (!window.location.protocol.startsWith("http")) return;
+  apiJson("/audit", {
+    method: "POST",
+    body: JSON.stringify({ eventType, refId, ...payload }),
+  }).catch(() => {});
+}
+
+function updateSelectedManualStatus(status) {
+  const selected = selectedManualEntries();
+  if (!selected.length) {
+    els.status.textContent = "Selecione lancamentos HTML para alterar o status operacional.";
+    return;
+  }
+  const timestamp = new Date().toISOString();
+  const ids = new Set(selected.map((entry) => entry.id));
+  state.manualEntries = state.manualEntries.map((entry) => {
+    if (!ids.has(entry.id)) return entry;
+    const history = Array.isArray(entry.statusHistory) ? entry.statusHistory : [];
+    return {
+      ...entry,
+      operationStatus: status,
+      approvedAt: status === "aprovado" ? timestamp : entry.approvedAt || "",
+      reopenedAt: status === "revisar" ? timestamp : entry.reopenedAt || "",
+      statusHistory: [
+        ...history,
+        { status, at: timestamp },
+      ],
+    };
+  });
+  postAuditEvent("ledger_status", status, {
+    entryIds: [...ids],
+    count: ids.size,
+    changedAt: timestamp,
+  });
+  saveManualEntries();
+  populateLedgerControls();
+  applyFilters();
+  els.status.textContent = `${ids.size} lancamento(s) HTML alterado(s) para ${status}.`;
 }
 
 function registerExportBatch(exportBatchId, entries) {
@@ -2554,6 +2627,11 @@ function registerExportBatch(exportBatchId, entries) {
 
 function exportLedgerCsv() {
   const entries = selectedLedgerForExport();
+  const blocked = entries.filter((entry) => entry.origin === "manual" && entry.operationStatus !== "aprovado" && entry.operationStatus !== "exportado");
+  if (blocked.length) {
+    els.status.textContent = `${blocked.length} lancamento(s) HTML precisam ser aprovados antes da exportacao.`;
+    return;
+  }
   const exportBatchId = `exp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const header = [
     "Parcelamento",
@@ -2626,7 +2704,7 @@ function addDraftTransactionToLedger() {
     ...entry,
     id: `manual-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     operationId,
-    operationStatus: entry.reviewStatus === "pronto" ? "pronto" : "revisar",
+    operationStatus: "rascunho",
     createdAt: new Date().toISOString(),
   }));
   entries.forEach((entry) => state.selectedLedgerIds.add(entry.id));
@@ -2723,7 +2801,9 @@ function importSystemState(payload, options = {}) {
   state.manualEntries = entries.map((entry) => ({
     ...entry,
     origin: entry.origin || "manual",
-    operationStatus: entry.operationStatus || (entry.reviewStatus === "pronto" ? "pronto" : "revisar"),
+    operationStatus: entry.operationStatus === "pronto"
+      ? "rascunho"
+      : entry.operationStatus || "rascunho",
   }));
   state.contractOverrides = payload?.contractOverrides && typeof payload.contractOverrides === "object"
     ? payload.contractOverrides
@@ -2848,7 +2928,7 @@ function addBatchEntriesToLedger() {
       ...entry,
       id: `manual-${Date.now()}-${Math.random().toString(16).slice(2)}`,
       operationId,
-      operationStatus: entry.reviewStatus === "pronto" ? "pronto" : "revisar",
+      operationStatus: "rascunho",
       createdAt: new Date().toISOString(),
     }));
   if (!entries.length) {
@@ -2923,6 +3003,7 @@ els.entityFilter.addEventListener("change", applyFilters);
   els.ledgerContractFilter,
   els.ledgerRuleFilter,
   els.ledgerReadyFilter,
+  els.ledgerFlowFilter,
   els.ledgerSearch,
 ].forEach((control) => {
   control.addEventListener("input", () => {
@@ -2944,6 +3025,9 @@ els.clearLedgerButton.addEventListener("click", () => {
   state.selectedLedgerIds.clear();
   renderLedgerPanel();
 });
+
+els.approveLedgerButton.addEventListener("click", () => updateSelectedManualStatus("aprovado"));
+els.reopenLedgerButton.addEventListener("click", () => updateSelectedManualStatus("revisar"));
 
 els.toggleVisibleLedger.addEventListener("change", () => {
   const rows = state.filteredLedger.slice(0, 700);
