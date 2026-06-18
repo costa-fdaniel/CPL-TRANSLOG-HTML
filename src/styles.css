@@ -225,16 +225,17 @@ button:disabled {
 
 .select,
 .search {
-  background: var(--surface);
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
   border: 1px solid var(--line);
   border-radius: var(--radius-xs);
   min-height: var(--control-height);
   padding: 0 var(--space-4);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .select:focus,
 .search:focus {
+  background: #ffffff;
   border-color: var(--blue);
   box-shadow: 0 0 0 3px var(--focus-ring);
   outline: 0;
@@ -515,6 +516,14 @@ button:disabled {
   min-height: 96px;
   overflow: hidden;
   padding: var(--space-7) var(--space-8);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.kpi:hover,
+.summary-hero:hover,
+.summary-tile:hover,
+.panel:hover {
+  border-color: var(--border-strong);
 }
 
 .kpi::before {
@@ -818,6 +827,7 @@ button:disabled {
   box-shadow: var(--shadow-soft);
   min-width: 0;
   overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .panel-wide {
@@ -909,8 +919,10 @@ button:disabled {
 .transaction-form label {
   color: var(--muted);
   display: grid;
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 800;
   gap: var(--space-2);
+  text-transform: uppercase;
 }
 
 .transaction-form .field-hidden {
@@ -932,8 +944,10 @@ button:disabled {
 .contract-editor-grid label {
   color: var(--muted);
   display: grid;
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 800;
   gap: var(--space-2);
+  text-transform: uppercase;
 }
 
 .wide-field {
@@ -941,8 +955,8 @@ button:disabled {
 }
 
 .explanation-box {
-  background: #f8fbff;
-  border: 1px solid var(--line-soft);
+  background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
   color: var(--text);
   font-size: 14px;
@@ -962,8 +976,8 @@ button:disabled {
 }
 
 .snapshot-grid div {
-  background: #f8fbff;
-  border: 1px solid var(--line-soft);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid var(--border-soft);
   border-radius: var(--radius-md);
   display: grid;
   gap: var(--space-2);
@@ -972,7 +986,9 @@ button:disabled {
 
 .snapshot-grid span {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .snapshot-grid strong {
@@ -1517,6 +1533,7 @@ button:disabled {
   background: #ffffff;
   border-top: 1px solid rgba(213, 222, 234, 0.68);
   overflow: auto;
+  scrollbar-color: #b8c7da #f8fbff;
 }
 
 .ledger-wrap {
@@ -1532,14 +1549,15 @@ th,
 td {
   border-bottom: 1px solid rgba(237, 241, 246, 0.95);
   font-size: 12px;
-  padding: var(--space-4) var(--space-5);
+  padding: var(--space-5) var(--space-6);
   text-align: left;
-  vertical-align: top;
+  vertical-align: middle;
   white-space: nowrap;
 }
 
 th {
-  background: #f8fbff;
+  backdrop-filter: blur(8px);
+  background: rgba(248, 251, 255, 0.96);
   color: var(--muted);
   font-size: 11px;
   font-weight: 800;
@@ -1556,11 +1574,13 @@ td:last-child {
 }
 
 tr[data-selected="true"] {
-  background: #edf4ff;
+  background: linear-gradient(90deg, #edf4ff 0%, #ffffff 100%);
+  box-shadow: inset 4px 0 0 var(--blue);
 }
 
 .manual-row {
   background: #f4fbf8;
+  box-shadow: inset 4px 0 0 rgba(8, 117, 111, 0.32);
 }
 
 tbody tr:nth-child(even):not([data-selected="true"]) {
@@ -1571,48 +1591,76 @@ tbody tr:hover {
   background: #f1f7ff;
 }
 
+td:nth-child(6),
+td:nth-child(7),
+td:nth-child(8) {
+  font-variant-numeric: tabular-nums;
+}
+
 .pill {
-  border-radius: 999px;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
   display: inline-flex;
   font-size: 11px;
   font-weight: 800;
+  gap: var(--space-1);
   line-height: 1;
-  padding: 5px 8px;
+  padding: 6px 9px;
+  text-transform: uppercase;
+}
+
+.pill::before {
+  background: currentColor;
+  border-radius: var(--radius-pill);
+  content: "";
+  height: 6px;
+  opacity: 0.75;
+  width: 6px;
 }
 
 .pill-active {
   background: var(--green-soft);
+  border-color: #b9eadb;
   color: var(--green);
 }
 
 .pill-settled {
   background: #f1f5f9;
+  border-color: #e2e8f0;
   color: var(--muted);
 }
 
 .pill-approved {
   background: var(--blue-soft);
+  border-color: #c7ddff;
   color: var(--blue);
 }
 
 .pill-warning {
   background: var(--amber-soft);
+  border-color: #f7d5a5;
   color: var(--amber);
 }
 
 .pill-danger {
   background: var(--red-soft);
+  border-color: #f5b8b8;
   color: var(--red);
 }
 
 .batch-error {
-  background: #fff5f5;
+  background: #fff5f5 !important;
+  box-shadow: inset 4px 0 0 var(--red);
 }
 
 .source-column {
+  background: #f1f5f9;
+  border-radius: var(--radius-pill);
   color: var(--muted);
   font-size: 11px;
-  margin-left: 4px;
+  margin-left: var(--space-1);
+  padding: 3px 6px;
 }
 
 .op-status {
@@ -1628,25 +1676,25 @@ tbody tr:hover {
 
 .control-grid {
   display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(8, minmax(120px, 1fr));
+  gap: var(--space-6);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
 .control-card {
-  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
-  border: 1px solid var(--line-soft);
-  border-radius: 8px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
   display: grid;
-  gap: 8px;
-  min-height: 76px;
-  padding: 12px;
+  gap: var(--space-3);
+  min-height: 88px;
+  padding: var(--space-6);
 }
 
 .control-card span {
   color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 800;
   text-transform: uppercase;
 }
 
@@ -1678,14 +1726,14 @@ tbody tr:hover {
 .export-readiness-card {
   align-items: center;
   display: grid;
-  gap: 16px;
+  gap: var(--space-8);
   grid-template-columns: minmax(260px, 1fr) minmax(420px, 1.3fr);
-  padding: 14px;
+  padding: var(--space-8);
 }
 
 .export-readiness-main {
   display: grid;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .export-readiness-main span,
@@ -1709,17 +1757,17 @@ tbody tr:hover {
 
 .export-readiness-metrics {
   display: grid;
-  gap: 10px;
+  gap: var(--space-4);
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .export-readiness-metrics div {
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid var(--line-soft);
-  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
   display: grid;
-  gap: 5px;
-  padding: 10px;
+  gap: var(--space-1);
+  padding: var(--space-4);
 }
 
 .export-readiness-metrics strong {
