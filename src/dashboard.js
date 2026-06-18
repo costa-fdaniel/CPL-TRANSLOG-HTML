@@ -392,6 +392,23 @@ function panelLedgerEntries() {
     .filter((entry) => contractId === "all" || String(entry.contractId) === contractId);
 }
 
+function isInterestLedgerEntry(entry) {
+  const text = removeAccents([
+    entry.rule,
+    entry.description,
+    entry.installmentComponent,
+  ].join(" ")).toLowerCase();
+  return entry.installmentComponent === "juros" || text.includes("juros");
+}
+
+function panelInterestEntries(entries = panelLedgerEntries()) {
+  return entries.filter(isInterestLedgerEntry);
+}
+
+function panelInterestAmount(entries = panelLedgerEntries()) {
+  return sum(panelInterestEntries(entries), (entry) => entry.amount);
+}
+
 function panelContracts() {
   const { year, contractId } = panelFilterValues();
   const visibleIds = new Set(panelLedgerEntries().map((entry) => entry.contractId));
@@ -1355,15 +1372,18 @@ function render() {
 }
 
 function renderKpis() {
-  const contracts = state.filteredContracts;
+  const contracts = panelContracts();
+  const entries = panelLedgerEntries();
+  const interest = panelInterestAmount(entries);
+  const manualEntries = entries.filter((entry) => entry.origin === "manual");
   const items = [
     ["Contratos", contracts.length],
     ["Ativos", contracts.filter((contract) => contract.status === "ativo").length],
     ["Quitados", contracts.filter((contract) => contract.status === "quitado").length],
     ["Divida final", fmtMoney(sum(contracts, (contract) => contract.balances.finalDebt))],
-    ["Juros no ano", fmtMoney(sum(contracts, (contract) => contract.balances.interestTotal))],
-    ["Lancamentos filtrados", state.filteredLedger.length],
-    ["Transacoes HTML", state.manualEntries.length],
+    ["Juros no ano", fmtMoney(interest)],
+    ["Lancamentos filtrados", entries.length],
+    ["Transacoes HTML", manualEntries.length],
   ];
   els.kpis.innerHTML = items.map(([label, value]) => `
     <section class="kpi">
@@ -1389,6 +1409,7 @@ function renderPanelSummary() {
   const contracts = panelContracts();
   const entries = panelLedgerEntries();
   const manualEntries = entries.filter((entry) => entry.origin === "manual");
+  const interestAmount = panelInterestAmount(entries);
   const finalDebt = sum(contracts, (contract) => contract.balances.finalDebt);
   const originalDebt = sum(
     state.data.contracts.filter((contract) => contracts.some((item) => item.id === contract.id)),
@@ -1414,8 +1435,9 @@ function renderPanelSummary() {
       <small>${entries.length} lancamento(s)</small>
     </div>
     <div class="summary-tile">
-      <span>HTML / revisar</span>
-      <strong>${manualEntries.length} / ${reviewCount}</strong>
+      <span>Juros / revisar</span>
+      <strong>${fmtMoney(interestAmount)}</strong>
+      <small>${manualEntries.length} HTML | ${reviewCount} revisar</small>
     </div>
   `;
 }
@@ -1448,12 +1470,13 @@ function renderMonthlyChart() {
 
 function renderDebtSplit() {
   const contracts = panelContracts();
+  const entries = panelLedgerEntries();
   const current = sum(contracts, (contract) => Math.max(0, contract.balances.currentFinal));
   const nonCurrent = sum(contracts, (contract) => Math.max(0, contract.balances.nonCurrentFinal));
   const total = Math.max(current + nonCurrent, 1);
   const currentPct = (current / total) * 100;
   const nonCurrentPct = (nonCurrent / total) * 100;
-  const interest = sum(contracts, (contract) => Math.max(0, contract.balances.interestTotal));
+  const interest = panelInterestAmount(entries);
 
   els.debtSplitChart.innerHTML = `
     <div class="donut-layout">
@@ -1466,7 +1489,7 @@ function renderDebtSplit() {
       <div class="split-legend">
         <div><span class="dot current"></span> Circulante <strong>${fmtMoney(current, true)}</strong> <em>${currentPct.toFixed(1).replace(".", ",")}%</em></div>
         <div><span class="dot non-current"></span> Nao circulante <strong>${fmtMoney(nonCurrent, true)}</strong> <em>${nonCurrentPct.toFixed(1).replace(".", ",")}%</em></div>
-        <div><span class="dot amber"></span> Juros total <strong>${fmtMoney(interest, true)}</strong></div>
+        <div><span class="dot amber"></span> Juros no filtro <strong>${fmtMoney(interest, true)}</strong></div>
       </div>
     </div>
   `;
@@ -1487,12 +1510,16 @@ function renderTopContractsChart() {
 }
 
 function renderInterestChart() {
+  const interestByContract = groupSum(
+    panelInterestEntries(),
+    (entry) => entry.contractId,
+    (entry) => entry.amount,
+  );
   const items = panelContracts()
-    .filter((contract) => contract.balances.finalDebt > 0)
     .map((contract) => ({
       id: contract.id,
       label: `${contract.id} - ${contract.contractNumber}`,
-      value: contract.balances.interestTotal,
+      value: interestByContract[contract.id] || 0,
       meta: contract.entity,
     }))
     .filter((item) => item.value > 0)
@@ -1588,6 +1615,7 @@ function selectPanelContract(contractId) {
   els.panelContractFilter.value = String(contractId);
   syncTransactionContractToSelected();
   state.transactionDraftEntries = simulateTransaction();
+  renderKpis();
   renderPanelCharts();
   renderContractsTable();
   renderDetail();
@@ -3400,7 +3428,10 @@ els.entityFilter.addEventListener("change", applyFilters);
   els.panelYearFilter,
   els.panelContractFilter,
 ].forEach((control) => {
-  control.addEventListener("change", renderPanelCharts);
+  control.addEventListener("change", () => {
+    renderKpis();
+    renderPanelCharts();
+  });
 });
 
 [
