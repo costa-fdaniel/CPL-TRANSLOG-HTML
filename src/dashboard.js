@@ -1618,9 +1618,10 @@ function renderSvgBarChart(container, items, options = {}) {
   const peak = items[values.indexOf(max)] || items[0];
   const gradientId = `${container.id || "chart"}Gradient`;
   const greenGradientId = `${container.id || "chart"}GreenGradient`;
-  const width = Math.max(760, items.length * 72);
-  const height = 276;
-  const margin = { top: 26, right: 18, bottom: 44, left: 48 };
+  const labelMode = options.labelMode || (items.length > 10 ? "sparse" : "all");
+  const width = Math.max(820, items.length * 86);
+  const height = 292;
+  const margin = { top: 42, right: 18, bottom: 44, left: 48 };
   const chartWidth = width - margin.left - margin.right;
   const chartHeight = height - margin.top - margin.bottom;
   const slot = chartWidth / items.length;
@@ -1636,11 +1637,18 @@ function renderSvgBarChart(container, items, options = {}) {
     const x = margin.left + index * slot + (slot - barWidth) / 2;
     const y = margin.top + chartHeight - barHeight;
     const label = String(item[labelKey] ?? "-");
-    const count = item.count ? `<tspan class="svg-count" x="${(x + barWidth / 2).toFixed(2)}" dy="13">${item.count} lanc.</tspan>` : "";
+    const shouldShowValue = labelMode === "all"
+      || (labelMode === "sparse" && (index % 2 === 0 || value === max || index === items.length - 1))
+      || (labelMode === "peak" && (value === max || index === items.length - 1));
+    const valueLabel = shouldShowValue
+      ? `<text class="svg-value" x="${(x + barWidth / 2).toFixed(2)}" y="${Math.max(16, y - 10).toFixed(2)}">${escapeHtml(valueFormatter(value))}</text>`
+      : "";
+    const count = item.count && shouldShowValue ? `<text class="svg-count" x="${(x + barWidth / 2).toFixed(2)}" y="${Math.max(28, y + 16).toFixed(2)}">${item.count} lanc.</text>` : "";
     return `
       <g class="svg-bar-group">
         <title>${escapeHtml(label)}: ${escapeHtml(preciseFormatter(value))}${item.count ? ` | ${item.count} lancamento(s)` : ""}</title>
-        <text class="svg-value" x="${(x + barWidth / 2).toFixed(2)}" y="${Math.max(14, y - 8).toFixed(2)}">${escapeHtml(valueFormatter(value))}${count}</text>
+        ${valueLabel}
+        ${count}
         <rect class="svg-bar ${options.tone === "green" ? "svg-bar-green" : ""}" style="fill:url(#${escapeHtml(options.tone === "green" ? greenGradientId : gradientId)})" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barWidth.toFixed(2)}" height="${barHeight.toFixed(2)}" rx="8"></rect>
         <text class="svg-label" x="${(x + barWidth / 2).toFixed(2)}" y="${(height - 16).toFixed(2)}">${escapeHtml(label)}</text>
       </g>
