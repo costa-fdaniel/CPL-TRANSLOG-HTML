@@ -63,26 +63,39 @@
         </section>
 
         <section id="panelTab" class="tab-panel active">
-          <section class="panel-filter-bar">
-            <label>
-              <span>Ano do painel</span>
-              <select id="panelYearFilter" class="select">
-                <option value="all">Todos os anos</option>
-              </select>
-            </label>
-            <label>
-              <span>Contrato no painel</span>
-              <select id="panelContractFilter" class="select">
-                <option value="all">Todos os contratos</option>
-              </select>
-            </label>
-          </section>
+          <details class="section-group" open>
+            <summary>
+              <span>Visao executiva</span>
+              <small>Filtros, indicadores e saldo atualizado do sistema.</small>
+            </summary>
+            <div class="section-content">
+              <section class="panel-filter-bar">
+                <label>
+                  <span>Ano do painel</span>
+                  <select id="panelYearFilter" class="select">
+                    <option value="all">Todos os anos</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Contrato no painel</span>
+                  <select id="panelContractFilter" class="select">
+                    <option value="all">Todos os contratos</option>
+                  </select>
+                </label>
+              </section>
 
-          <section id="kpis" class="kpi-grid"></section>
+              <section id="kpis" class="kpi-grid"></section>
 
-          <section id="panelSummary" class="panel-summary"></section>
+              <section id="panelSummary" class="panel-summary"></section>
+            </div>
+          </details>
 
-          <section class="dashboard-stack">
+          <details class="section-group" open>
+            <summary>
+              <span>Fluxo principal</span>
+              <small>Previsao mensal conforme ano, contrato, status e empresa selecionados.</small>
+            </summary>
+            <div class="section-content dashboard-stack">
             <div class="panel panel-wide">
               <div class="panel-header">
                 <div class="panel-title">Fluxo mensal previsto</div>
@@ -91,7 +104,15 @@
                 <div id="monthlyChart" class="chart"></div>
               </div>
             </div>
+            </div>
+          </details>
 
+          <details class="section-group">
+            <summary>
+              <span>Analises detalhadas da carteira</span>
+              <small>Composicao da divida, rankings, saldos por empresa e pontos de revisao.</small>
+            </summary>
+            <div class="section-content">
             <section class="panel-columns">
               <div class="panel-stack">
                 <div class="panel">
@@ -160,162 +181,177 @@
                 </div>
               </div>
             </section>
-          </section>
+            </div>
+          </details>
         </section>
 
         <section id="transactionsTab" class="tab-panel">
-          <section class="workflow-strip">
-            <div><strong>1</strong><span>Escolha contrato, acao e parcelas</span></div>
-            <div><strong>2</strong><span>Confira a previa contabil</span></div>
-            <div><strong>3</strong><span>Adicione a esteira CSV</span></div>
-          </section>
+          <details class="section-group" open>
+            <summary>
+              <span>Operacao do contrato</span>
+              <small>Escolha o contrato, selecione parcelas, simule e envie para a esteira.</small>
+            </summary>
+            <div class="section-content">
+              <section class="workflow-strip">
+                <div><strong>1</strong><span>Escolha contrato, acao e parcelas</span></div>
+                <div><strong>2</strong><span>Confira a previa contabil</span></div>
+                <div><strong>3</strong><span>Adicione a esteira CSV</span></div>
+              </section>
 
-          <section class="grid-two transaction-layout">
-            <div class="panel">
-              <div class="panel-header">
-                <div class="panel-title">Lancamento do contrato</div>
-                <div class="action-row">
-                  <button id="simulateTransactionButton" class="button">Simular</button>
-                  <button id="addTransactionButton" class="button primary">Adicionar a esteira</button>
+              <section class="grid-two transaction-layout">
+                <div class="panel">
+                  <div class="panel-header">
+                    <div class="panel-title">Lancamento do contrato</div>
+                    <div class="action-row">
+                      <button id="simulateTransactionButton" class="button">Simular</button>
+                      <button id="addTransactionButton" class="button primary">Adicionar a esteira</button>
+                    </div>
+                  </div>
+                  <div class="panel-body">
+                    <div class="transaction-form">
+                      <label>
+                        <span>Contrato</span>
+                        <select id="transactionContractSelect" class="select"></select>
+                      </label>
+                      <label>
+                        <span>Acao</span>
+                        <select id="transactionActionSelect" class="select">
+                          <option value="payment">Pagamento / amortizacao</option>
+                          <option value="paid_installment_adjustment">Ajuste de parcela paga</option>
+                          <option value="interest_adjustment">Ajuste de juros</option>
+                          <option value="liability_adjustment">Ajuste do passivo</option>
+                          <option value="liability_transfer_nc_current">Transf. Passivo NC/C</option>
+                          <option value="interest_transfer_nc_current">Transf. Juros Passivo NC/C</option>
+                          <option value="interest_reversal_dre">Estorno de juros (DRE)</option>
+                          <option value="interest_complement_dre">Complemento de juros (DRE)</option>
+                          <option value="settlement">Quitacao</option>
+                          <option value="custom">Lancamento manual</option>
+                        </select>
+                      </label>
+                      <label>
+                        <span>Data</span>
+                        <input id="transactionDateInput" class="select" type="date">
+                      </label>
+                      <label data-field="amount">
+                        <span>Valor total</span>
+                        <input id="transactionAmountInput" class="select" type="number" step="0.01" min="0" placeholder="0,00">
+                      </label>
+                      <label data-field="installments">
+                        <span>N parcelas</span>
+                        <input id="transactionInstallmentsInput" class="select" type="number" min="1" value="1">
+                      </label>
+                      <label>
+                        <span>Quitou?</span>
+                        <select id="transactionSettledSelect" class="select">
+                          <option value="N">Nao</option>
+                          <option value="S">Sim</option>
+                        </select>
+                      </label>
+                      <label data-field="scope">
+                        <span>Alvo</span>
+                        <select id="transactionScopeSelect" class="select">
+                          <option value="current">Circulante</option>
+                          <option value="non_current">Nao circulante</option>
+                          <option value="both">Circulante + Nao circulante</option>
+                        </select>
+                      </label>
+                      <label data-field="direction">
+                        <span>Direcao</span>
+                        <select id="transactionDirectionSelect" class="select">
+                          <option value="increase">Aumenta saldo/juros</option>
+                          <option value="decrease">Reduz saldo/juros</option>
+                        </select>
+                      </label>
+                      <label data-field="manual">
+                        <span>Debito manual</span>
+                        <input id="transactionDebitInput" class="select" type="text" placeholder="Opcional">
+                      </label>
+                      <label data-field="manual">
+                        <span>Credito manual</span>
+                        <input id="transactionCreditInput" class="select" type="text" placeholder="Opcional">
+                      </label>
+                      <label class="wide-field">
+                        <span>Observacao</span>
+                        <textarea id="transactionNoteInput" class="select" rows="3" placeholder="Detalhe que deve aparecer no historico"></textarea>
+                      </label>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div class="panel-body">
-                <div class="transaction-form">
-                  <label>
-                    <span>Contrato</span>
-                    <select id="transactionContractSelect" class="select"></select>
-                  </label>
-                  <label>
-                    <span>Acao</span>
-                    <select id="transactionActionSelect" class="select">
-                      <option value="payment">Pagamento / amortizacao</option>
-                      <option value="paid_installment_adjustment">Ajuste de parcela paga</option>
-                      <option value="interest_adjustment">Ajuste de juros</option>
-                      <option value="liability_adjustment">Ajuste do passivo</option>
-                      <option value="liability_transfer_nc_current">Transf. Passivo NC/C</option>
-                      <option value="interest_transfer_nc_current">Transf. Juros Passivo NC/C</option>
-                      <option value="interest_reversal_dre">Estorno de juros (DRE)</option>
-                      <option value="interest_complement_dre">Complemento de juros (DRE)</option>
-                      <option value="settlement">Quitacao</option>
-                      <option value="custom">Lancamento manual</option>
-                    </select>
-                  </label>
-                  <label>
-                    <span>Data</span>
-                    <input id="transactionDateInput" class="select" type="date">
-                  </label>
-                  <label data-field="amount">
-                    <span>Valor total</span>
-                    <input id="transactionAmountInput" class="select" type="number" step="0.01" min="0" placeholder="0,00">
-                  </label>
-                  <label data-field="installments">
-                    <span>N parcelas</span>
-                    <input id="transactionInstallmentsInput" class="select" type="number" min="1" value="1">
-                  </label>
-                  <label>
-                    <span>Quitou?</span>
-                    <select id="transactionSettledSelect" class="select">
-                      <option value="N">Nao</option>
-                      <option value="S">Sim</option>
-                    </select>
-                  </label>
-                  <label data-field="scope">
-                    <span>Alvo</span>
-                    <select id="transactionScopeSelect" class="select">
-                      <option value="current">Circulante</option>
-                      <option value="non_current">Nao circulante</option>
-                      <option value="both">Circulante + Nao circulante</option>
-                    </select>
-                  </label>
-                  <label data-field="direction">
-                    <span>Direcao</span>
-                    <select id="transactionDirectionSelect" class="select">
-                      <option value="increase">Aumenta saldo/juros</option>
-                      <option value="decrease">Reduz saldo/juros</option>
-                    </select>
-                  </label>
-                  <label data-field="manual">
-                    <span>Debito manual</span>
-                    <input id="transactionDebitInput" class="select" type="text" placeholder="Opcional">
-                  </label>
-                  <label data-field="manual">
-                    <span>Credito manual</span>
-                    <input id="transactionCreditInput" class="select" type="text" placeholder="Opcional">
-                  </label>
-                  <label class="wide-field">
-                    <span>Observacao</span>
-                    <textarea id="transactionNoteInput" class="select" rows="3" placeholder="Detalhe que deve aparecer no historico"></textarea>
-                  </label>
+
+                <div class="panel">
+                  <div class="panel-header">
+                    <div class="panel-title">Resumo do contrato</div>
+                  </div>
+                  <div class="panel-body">
+                    <div id="transactionExplanation" class="explanation-box"></div>
+                    <div id="transactionContractSnapshot" class="snapshot-grid"></div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              </section>
 
-            <div class="panel">
-              <div class="panel-header">
-                <div class="panel-title">Resumo do contrato</div>
-              </div>
-              <div class="panel-body">
-                <div id="transactionExplanation" class="explanation-box"></div>
-                <div id="transactionContractSnapshot" class="snapshot-grid"></div>
-              </div>
-            </div>
-          </section>
+              <section class="panel">
+                <div class="panel-header">
+                  <div class="panel-title">Parcelas do contrato</div>
+                  <div class="action-row">
+                    <button id="selectNextInstallmentButton" class="button secondary">Selecionar proxima</button>
+                    <button id="selectAllPendingInstallmentsButton" class="button secondary">Selecionar pendentes</button>
+                    <button id="clearInstallmentSelectionButton" class="button secondary">Limpar parcelas</button>
+                  </div>
+                </div>
+                <div class="panel-body">
+                  <div id="paymentInstallmentSummary" class="installment-summary"></div>
+                </div>
+                <div class="table-wrap installments-wrap">
+                  <table id="paymentInstallmentsTable">
+                    <thead>
+                      <tr>
+                        <th>Sel.</th>
+                        <th>Parcela</th>
+                        <th>Vencimento</th>
+                        <th>Principal</th>
+                        <th>Juros</th>
+                        <th>Total</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </section>
 
-          <section class="panel">
-            <div class="panel-header">
-              <div class="panel-title">Parcelas do contrato</div>
-              <div class="action-row">
-                <button id="selectNextInstallmentButton" class="button secondary">Selecionar proxima</button>
-                <button id="selectAllPendingInstallmentsButton" class="button secondary">Selecionar pendentes</button>
-                <button id="clearInstallmentSelectionButton" class="button secondary">Limpar parcelas</button>
-              </div>
+              <section class="panel">
+                <div class="panel-header">
+                  <div class="panel-title">Previa do lancamento</div>
+                  <div id="transactionSimulationCount" class="panel-note"></div>
+                </div>
+                <div class="table-wrap">
+                  <table id="transactionSimulationTable">
+                    <thead>
+                      <tr>
+                        <th>Data</th>
+                        <th>Parcela</th>
+                        <th>Contrato</th>
+                        <th>Regra</th>
+                        <th>Debito</th>
+                        <th>Credito</th>
+                        <th>Valor</th>
+                        <th>Situacao</th>
+                        <th>Historico</th>
+                      </tr>
+                    </thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </section>
             </div>
-            <div class="panel-body">
-              <div id="paymentInstallmentSummary" class="installment-summary"></div>
-            </div>
-            <div class="table-wrap installments-wrap">
-              <table id="paymentInstallmentsTable">
-                <thead>
-                  <tr>
-                    <th>Sel.</th>
-                    <th>Parcela</th>
-                    <th>Vencimento</th>
-                    <th>Principal</th>
-                    <th>Juros</th>
-                    <th>Total</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody></tbody>
-              </table>
-            </div>
-          </section>
+          </details>
 
-          <section class="panel">
-            <div class="panel-header">
-              <div class="panel-title">Previa do lancamento</div>
-              <div id="transactionSimulationCount" class="panel-note"></div>
-            </div>
-            <div class="table-wrap">
-              <table id="transactionSimulationTable">
-                <thead>
-                  <tr>
-                    <th>Data</th>
-                    <th>Parcela</th>
-                    <th>Contrato</th>
-                    <th>Regra</th>
-                    <th>Debito</th>
-                    <th>Credito</th>
-                    <th>Valor</th>
-                    <th>Situacao</th>
-                    <th>Historico</th>
-                  </tr>
-                </thead>
-                <tbody></tbody>
-              </table>
-            </div>
-          </section>
-
+          <details class="section-group">
+            <summary>
+              <span>Camada HTML e recuperacao</span>
+              <small>Lancamentos manuais salvos, estado JSON e pontos de recuperacao.</small>
+            </summary>
+            <div class="section-content">
           <section class="panel">
             <div class="panel-header">
               <div class="panel-title">Lancamentos HTML salvos</div>
@@ -362,7 +398,15 @@
               </table>
             </div>
           </section>
+            </div>
+          </details>
 
+          <details class="section-group">
+            <summary>
+              <span>Importacao em lote</span>
+              <small>Modelo CSV padrao para criar varios lancamentos de uma vez.</small>
+            </summary>
+            <div class="section-content">
           <section class="panel">
             <div class="panel-header">
               <div class="panel-title">Importacao em lote</div>
@@ -397,54 +441,70 @@
               </table>
             </div>
           </section>
+            </div>
+          </details>
         </section>
 
         <section id="ledgerTab" class="tab-panel">
-          <section class="workflow-strip">
-            <div><strong>1</strong><span>Filtre os lancamentos</span></div>
-            <div><strong>2</strong><span>Aprove ou reabra HTML</span></div>
-            <div><strong>3</strong><span>Exporte o CSV contabil</span></div>
-          </section>
+          <details class="section-group" open>
+            <summary>
+              <span>Preparacao do CSV contabil</span>
+              <small>Filtros, aprovacao, reabertura e exportacao da esteira.</small>
+            </summary>
+            <div class="section-content">
+              <section class="workflow-strip">
+                <div><strong>1</strong><span>Filtre os lancamentos</span></div>
+                <div><strong>2</strong><span>Aprove ou reabra HTML</span></div>
+                <div><strong>3</strong><span>Exporte o CSV contabil</span></div>
+              </section>
 
-          <section class="panel">
-            <div class="panel-header">
-              <div class="panel-title">Esteira contabil</div>
-              <div class="action-row">
-                <button id="selectLedgerButton" class="button">Selecionar filtrados</button>
-                <button id="clearLedgerButton" class="button secondary">Limpar selecao</button>
-                <button id="approveLedgerButton" class="button secondary">Aprovar</button>
-                <button id="reopenLedgerButton" class="button secondary">Reabrir</button>
-                <button id="exportLedgerButton" class="button primary">Exportar CSV</button>
-              </div>
+              <section class="panel">
+                <div class="panel-header">
+                  <div class="panel-title">Esteira contabil</div>
+                  <div class="action-row">
+                    <button id="selectLedgerButton" class="button">Selecionar filtrados</button>
+                    <button id="clearLedgerButton" class="button secondary">Limpar selecao</button>
+                    <button id="approveLedgerButton" class="button secondary">Aprovar</button>
+                    <button id="reopenLedgerButton" class="button secondary">Reabrir</button>
+                    <button id="exportLedgerButton" class="button primary">Exportar CSV</button>
+                  </div>
+                </div>
+                <div class="panel-body">
+                  <div class="filter-grid">
+                    <select id="ledgerYearFilter" class="select" aria-label="Ano"></select>
+                    <input id="ledgerDateFrom" class="select" type="date" aria-label="Data inicial">
+                    <input id="ledgerDateTo" class="select" type="date" aria-label="Data final">
+                    <select id="ledgerContractFilter" class="select" aria-label="Contrato"></select>
+                    <select id="ledgerRuleFilter" class="select" aria-label="Regra"></select>
+                    <select id="ledgerReadyFilter" class="select" aria-label="Situacao">
+                      <option value="pronto">Prontos</option>
+                      <option value="revisar">Revisar</option>
+                      <option value="all">Todos</option>
+                    </select>
+                    <select id="ledgerFlowFilter" class="select" aria-label="Fluxo">
+                      <option value="not_exported">Nao exportados</option>
+                      <option value="approved">Aprovados</option>
+                      <option value="draft">Rascunho</option>
+                      <option value="exported">Exportados</option>
+                      <option value="all">Todos os fluxos</option>
+                    </select>
+                    <input id="ledgerSearchInput" class="search" type="search" placeholder="Buscar conta, descricao ou regra">
+                  </div>
+                </div>
+              </section>
+
+              <section id="ledgerKpis" class="kpi-grid compact"></section>
+
+              <section id="ledgerExportReadiness" class="export-readiness"></section>
             </div>
-            <div class="panel-body">
-              <div class="filter-grid">
-                <select id="ledgerYearFilter" class="select" aria-label="Ano"></select>
-                <input id="ledgerDateFrom" class="select" type="date" aria-label="Data inicial">
-                <input id="ledgerDateTo" class="select" type="date" aria-label="Data final">
-                <select id="ledgerContractFilter" class="select" aria-label="Contrato"></select>
-                <select id="ledgerRuleFilter" class="select" aria-label="Regra"></select>
-                <select id="ledgerReadyFilter" class="select" aria-label="Situacao">
-                  <option value="pronto">Prontos</option>
-                  <option value="revisar">Revisar</option>
-                  <option value="all">Todos</option>
-                </select>
-                <select id="ledgerFlowFilter" class="select" aria-label="Fluxo">
-                  <option value="not_exported">Nao exportados</option>
-                  <option value="approved">Aprovados</option>
-                  <option value="draft">Rascunho</option>
-                  <option value="exported">Exportados</option>
-                  <option value="all">Todos os fluxos</option>
-                </select>
-                <input id="ledgerSearchInput" class="search" type="search" placeholder="Buscar conta, descricao ou regra">
-              </div>
-            </div>
-          </section>
+          </details>
 
-          <section id="ledgerKpis" class="kpi-grid compact"></section>
-
-          <section id="ledgerExportReadiness" class="export-readiness"></section>
-
+          <details class="section-group">
+            <summary>
+              <span>Analise da esteira</span>
+              <small>Distribuicao por mes e regras contabeis com maior valor.</small>
+            </summary>
+            <div class="section-content">
           <section class="ledger-visual-grid">
             <div class="panel ledger-month-panel">
               <div class="panel-header">
@@ -469,7 +529,15 @@
               </div>
             </div>
           </section>
+            </div>
+          </details>
 
+          <details class="section-group" open>
+            <summary>
+              <span>Previa de exportacao</span>
+              <small>Linhas que serao levadas ao CSV contabil conforme os filtros atuais.</small>
+            </summary>
+            <div class="section-content">
           <section class="panel">
             <div class="panel-header">
               <div class="panel-title">Previa do CSV contabil</div>
@@ -495,6 +563,8 @@
               </table>
             </div>
           </section>
+            </div>
+          </details>
         </section>
 
         <section id="contractsTab" class="tab-panel">
@@ -597,14 +667,64 @@
         </section>
 
         <section id="auditTab" class="tab-panel">
-          <section class="workflow-strip system-strip">
-            <div><strong>1</strong><span>Valide pendencias</span></div>
-            <div><strong>2</strong><span>Confira diario do sistema</span></div>
-            <div><strong>3</strong><span>Revise regras e saldos</span></div>
-          </section>
+          <details class="section-group" open>
+            <summary>
+              <span>Saude operacional</span>
+              <small>Resumo, validador e reconciliacao para substituir a planilha com controle.</small>
+            </summary>
+            <div class="section-content">
+              <section class="workflow-strip system-strip">
+                <div><strong>1</strong><span>Valide pendencias</span></div>
+                <div><strong>2</strong><span>Confira diario do sistema</span></div>
+                <div><strong>3</strong><span>Revise regras e saldos</span></div>
+              </section>
 
-          <section id="operationalSummary" class="control-grid"></section>
+              <section id="operationalSummary" class="control-grid"></section>
 
+              <section class="grid-two">
+                <div class="panel">
+                  <div class="panel-header">
+                    <div class="panel-heading">
+                      <div class="panel-title">Validador operacional</div>
+                      <div class="panel-subtitle">Checks para substituir a planilha com trilha e controle.</div>
+                    </div>
+                  </div>
+                  <div class="panel-body">
+                    <div id="validationList" class="validation-list"></div>
+                  </div>
+                </div>
+
+                <div class="panel">
+                  <div class="panel-header">
+                    <div class="panel-heading">
+                      <div class="panel-title">Reconciliacao contabil</div>
+                      <div class="panel-subtitle">Maiores contas movimentadas por debito e credito.</div>
+                    </div>
+                  </div>
+                  <div class="table-wrap">
+                    <table id="reconciliationTable">
+                      <thead>
+                        <tr>
+                          <th>Conta</th>
+                          <th>Debito</th>
+                          <th>Credito</th>
+                          <th>Saldo</th>
+                        </tr>
+                      </thead>
+                      <tbody></tbody>
+                    </table>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </details>
+
+          <details class="section-group">
+            <summary>
+              <span>Diario e trilha</span>
+              <small>Eventos do SQLite e operacoes da camada HTML.</small>
+            </summary>
+            <div class="section-content">
           <section class="panel">
             <div class="panel-header">
               <div class="panel-heading">
@@ -628,42 +748,6 @@
             <div class="panel-body audit-event-layout">
               <div id="backendAuditSummary" class="audit-event-summary"></div>
               <div id="backendAuditList" class="audit-event-list"></div>
-            </div>
-          </section>
-
-          <section class="grid-two">
-            <div class="panel">
-              <div class="panel-header">
-                <div class="panel-heading">
-                  <div class="panel-title">Validador operacional</div>
-                  <div class="panel-subtitle">Checks para substituir a planilha com trilha e controle.</div>
-                </div>
-              </div>
-              <div class="panel-body">
-                <div id="validationList" class="validation-list"></div>
-              </div>
-            </div>
-
-            <div class="panel">
-              <div class="panel-header">
-                <div class="panel-heading">
-                  <div class="panel-title">Reconciliacao contabil</div>
-                  <div class="panel-subtitle">Maiores contas movimentadas por debito e credito.</div>
-                </div>
-              </div>
-              <div class="table-wrap">
-                <table id="reconciliationTable">
-                  <thead>
-                    <tr>
-                      <th>Conta</th>
-                      <th>Debito</th>
-                      <th>Credito</th>
-                      <th>Saldo</th>
-                    </tr>
-                  </thead>
-                  <tbody></tbody>
-                </table>
-              </div>
             </div>
           </section>
 
@@ -691,7 +775,15 @@
               </table>
             </div>
           </section>
+            </div>
+          </details>
 
+          <details class="section-group">
+            <summary>
+              <span>Regras e auditoria da base</span>
+              <small>Regras monitoradas, contas e alertas que preservam a coerencia da base.</small>
+            </summary>
+            <div class="section-content">
           <section class="grid-two">
             <div class="panel">
               <div class="panel-header">
@@ -719,6 +811,8 @@
               </div>
             </div>
           </section>
+            </div>
+          </details>
         </section>
       </main>
     </div>
