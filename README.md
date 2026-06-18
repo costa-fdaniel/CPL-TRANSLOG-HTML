@@ -158,6 +158,16 @@ Na aba `Transacoes`, use `Exportar estado JSON` para gerar um backup operacional
 
 Use `Importar estado JSON` para restaurar esse arquivo em outro navegador ou em outro momento. O botao `Carregar JSON` tambem reconhece esse arquivo de estado; quando ele for importado, a camada local e os saldos exibidos sao atualizados.
 
+### Pontos de recuperacao
+
+A aba `Transacoes` tambem mantem pontos de recuperacao no navegador. Eles servem para desfazer rapidamente uma acao operacional recente sem procurar um arquivo externo.
+
+- `Criar ponto`: salva um backup local da camada HTML atual.
+- `Baixar ultimo`: baixa o ultimo ponto como JSON.
+- `Restaurar ultimo`: substitui a camada HTML atual pelo ultimo ponto salvo.
+
+O sistema cria pontos automaticos antes de exportar o CSV contabil e antes de limpar a camada HTML. Os pontos ficam no navegador e nao substituem o backup externo gerado por `Exportar estado JSON`.
+
 ## Backend local
 
 O backend em `scripts/server.py` foi criado para ser leve e auditavel, sem dependencias extras alem da biblioteca padrao do Python. Endpoints principais:

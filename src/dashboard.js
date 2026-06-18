@@ -13,11 +13,13 @@ const state = {
   contractOverrides: {},
   auditEvents: [],
   operatorName: "",
+  recoveryPoints: [],
 };
 
 const MANUAL_STORAGE_KEY = "cpl-translog-html-manual-entries";
 const LOCAL_STATE_STORAGE_KEY = "cpl-translog-html-local-state";
 const OPERATOR_STORAGE_KEY = "cpl-translog-html-operator";
+const RECOVERY_STORAGE_KEY = "cpl-translog-html-recovery-points";
 const SYSTEM_STATE_SCHEMA = "cpl-translog-system-state";
 const API_BASE = "/api";
 
@@ -126,6 +128,10 @@ const els = {
   exportManualLayerButton: document.querySelector("#exportManualLayerButton"),
   systemStateInput: document.querySelector("#systemStateInput"),
   clearManualLayerButton: document.querySelector("#clearManualLayerButton"),
+  createRecoveryButton: document.querySelector("#createRecoveryButton"),
+  downloadRecoveryButton: document.querySelector("#downloadRecoveryButton"),
+  restoreRecoveryButton: document.querySelector("#restoreRecoveryButton"),
+  recoverySummary: document.querySelector("#recoverySummary"),
   downloadBatchTemplateButton: document.querySelector("#downloadBatchTemplateButton"),
   batchCsvInput: document.querySelector("#batchCsvInput"),
   addBatchEntriesButton: document.querySelector("#addBatchEntriesButton"),
@@ -542,6 +548,7 @@ function auditEventTypeLabel(type) {
     contract_override: "Contrato ajustado",
     contract_override_clear: "Ajuste removido",
     manual_layer_clear: "Camada HTML limpa",
+    recovery_restore: "Recuperacao restaurada",
   };
   return labels[type] || type || "Evento";
 }
@@ -579,6 +586,9 @@ function auditEventDetail(event) {
   }
   if (event.eventType === "manual_layer_clear") {
     return `${payload.clearedEntries || 0} lancamento(s) e ${payload.clearedOverrides || 0} ajuste(s) local(is) removido(s).`;
+  }
+  if (event.eventType === "recovery_restore") {
+    return `Ponto de ${auditEventTimeLabel(payload.recoveredPointAt)} restaurado.`;
   }
   return Object.entries(payload)
     .slice(0, 4)
@@ -663,6 +673,80 @@ function saveManualEntries(options = {}) {
   if (options.sync !== false) {
     persistStateToServer();
   }
+}
+
+function loadRecoveryPoints() {
+  try {
+    const points = JSON.parse(localStorage.getItem(RECOVERY_STORAGE_KEY) || "[]");
+    state.recoveryPoints = Array.isArray(points) ? points : [];
+  } catch {
+    state.recoveryPoints = [];
+  }
+}
+
+function saveRecoveryPoints() {
+  localStorage.setItem(RECOVERY_STORAGE_KEY, JSON.stringify(state.recoveryPoints.slice(0, 10)));
+}
+
+function latestRecoveryPoint() {
+  return state.recoveryPoints[0] || null;
+}
+
+function createRecoveryPoint(reason = "manual", options = {}) {
+  if (!state.data?.contracts?.length) {
+    if (!options.silent) els.status.textContent = "Carregue a base antes de criar um ponto de recuperacao.";
+    return null;
+  }
+  const payload = buildSystemStatePayload();
+  const point = {
+    id: `rec-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    createdAt: new Date().toISOString(),
+    reason,
+    operator: currentOperator() || "Operador nao informado",
+    counts: payload.counts,
+    payload,
+  };
+  state.recoveryPoints = [point, ...state.recoveryPoints].slice(0, 10);
+  saveRecoveryPoints();
+  renderRecoveryPanel();
+  if (!options.silent) {
+    els.status.textContent = `Ponto de recuperacao criado com ${point.counts.entries || 0} lancamento(s).`;
+  }
+  return point;
+}
+
+function downloadRecoveryPoint(point = latestRecoveryPoint()) {
+  if (!point) {
+    els.status.textContent = "Nenhum ponto de recuperacao disponivel para baixar.";
+    return;
+  }
+  const date = point.createdAt.slice(0, 10);
+  downloadTextFile(
+    `cpl-translog-recuperacao-${date}.json`,
+    JSON.stringify(point.payload, null, 2),
+    "application/json;charset=utf-8",
+  );
+}
+
+function restoreLatestRecoveryPoint() {
+  const point = latestRecoveryPoint();
+  if (!point) {
+    els.status.textContent = "Nenhum ponto de recuperacao disponivel para restaurar.";
+    return;
+  }
+  const operator = requireOperator("restaurar ponto de recuperacao");
+  if (!operator) return;
+  const ok = window.confirm(`Restaurar o ponto de ${auditEventTimeLabel(point.createdAt)}? A camada HTML atual sera substituida.`);
+  if (!ok) return;
+  createRecoveryPoint("antes de restaurar recuperacao", { silent: true });
+  importSystemState(point.payload);
+  postAuditEvent("recovery_restore", point.id, {
+    operator,
+    recoveredAt: new Date().toISOString(),
+    recoveredPointAt: point.createdAt,
+    reason: point.reason,
+  });
+  els.status.textContent = `Ponto de recuperacao restaurado por ${operator}.`;
 }
 
 function loadManualEntries() {
@@ -1248,6 +1332,7 @@ function renderEmpty() {
   els.ledgerKpis.innerHTML = "";
   els.transactionSimulationTable.innerHTML = "";
   els.manualTransactionsTable.innerHTML = "";
+  els.recoverySummary.innerHTML = "";
   els.paymentInstallmentSummary.innerHTML = "";
   els.paymentInstallmentsTable.innerHTML = "";
   els.batchImportSummary.innerHTML = "";
@@ -2356,6 +2441,7 @@ function renderTransactionPanel() {
   renderPaymentInstallments();
   renderTransactionSimulation();
   renderManualTransactions();
+  renderRecoveryPanel();
   renderBatchImport();
 }
 
@@ -2428,6 +2514,26 @@ function renderManualTransactions() {
     .sort((a, b) => b.date.localeCompare(a.date))
     .map((entry) => ledgerRowCells(entry, false))
     .join("") || `<tr><td colspan="9" class="empty-cell">Nenhuma transacao adicionada nesta camada local.</td></tr>`;
+}
+
+function renderRecoveryPanel() {
+  const point = latestRecoveryPoint();
+  const entries = point?.counts?.entries || 0;
+  const overrides = point?.counts?.contractOverrides || 0;
+  const created = point ? auditEventTimeLabel(point.createdAt) : "-";
+  const reason = point?.reason || "Sem ponto criado";
+  const operator = point?.operator || "-";
+  els.recoverySummary.innerHTML = `
+    <div class="summary-metric"><span>Ultimo ponto</span><strong>${escapeHtml(created)}</strong></div>
+    <div class="summary-metric"><span>Motivo</span><strong>${escapeHtml(reason)}</strong></div>
+    <div class="summary-metric"><span>Lancamentos</span><strong>${entries}</strong></div>
+    <div class="summary-metric"><span>Ajustes contrato</span><strong>${overrides}</strong></div>
+    <div class="summary-metric"><span>Operador</span><strong>${escapeHtml(operator)}</strong></div>
+    <div class="summary-metric"><span>Pontos salvos</span><strong>${state.recoveryPoints.length}</strong></div>
+  `;
+  const disabled = point ? false : true;
+  els.downloadRecoveryButton.disabled = disabled;
+  els.restoreRecoveryButton.disabled = disabled;
 }
 
 function parseCsv(text) {
@@ -2829,6 +2935,7 @@ function exportLedgerCsv() {
   }
   const operator = requireOperator("exportar CSV contabil");
   if (!operator) return;
+  createRecoveryPoint("antes de exportar CSV contabil", { silent: true });
   const exportBatchId = `exp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const header = [
     "Parcelamento",
@@ -3001,6 +3108,7 @@ function clearManualLayer() {
   if (!operator) return;
   const clearedEntries = state.manualEntries.length;
   const clearedOverrides = Object.keys(state.contractOverrides).length;
+  createRecoveryPoint("antes de limpar camada HTML", { silent: true });
   state.manualEntries = [];
   state.contractOverrides = {};
   state.selectedLedgerIds.clear();
@@ -3325,6 +3433,9 @@ els.addTransactionButton.addEventListener("click", addDraftTransactionToLedger);
 els.exportManualLayerButton.addEventListener("click", exportManualLayer);
 els.systemStateInput.addEventListener("change", handleSystemStateImport);
 els.clearManualLayerButton.addEventListener("click", clearManualLayer);
+els.createRecoveryButton.addEventListener("click", () => createRecoveryPoint("manual"));
+els.downloadRecoveryButton.addEventListener("click", () => downloadRecoveryPoint());
+els.restoreRecoveryButton.addEventListener("click", restoreLatestRecoveryPoint);
 els.selectNextInstallmentButton.addEventListener("click", selectNextInstallment);
 els.selectAllPendingInstallmentsButton.addEventListener("click", selectAllPendingInstallments);
 els.clearInstallmentSelectionButton.addEventListener("click", clearInstallmentSelection);
@@ -3334,4 +3445,5 @@ els.addBatchEntriesButton.addEventListener("click", addBatchEntriesToLedger);
 els.clearBatchImportButton.addEventListener("click", clearBatchImport);
 
 loadOperator();
+loadRecoveryPoints();
 loadDefaultData();

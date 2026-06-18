@@ -328,6 +328,18 @@
                 <button id="clearManualLayerButton" class="button secondary">Limpar camada local</button>
               </div>
             </div>
+            <div class="panel-body recovery-panel">
+              <div class="panel-heading">
+                <div class="panel-title">Pontos de recuperacao</div>
+                <div class="panel-subtitle">Backups locais criados manualmente e antes de acoes sensiveis.</div>
+              </div>
+              <div class="recovery-actions">
+                <button id="createRecoveryButton" class="button secondary">Criar ponto</button>
+                <button id="downloadRecoveryButton" class="button secondary">Baixar ultimo</button>
+                <button id="restoreRecoveryButton" class="button secondary">Restaurar ultimo</button>
+              </div>
+              <div id="recoverySummary" class="installment-summary recovery-summary"></div>
+            </div>
             <div class="table-wrap ledger-wrap">
               <table id="manualTransactionsTable">
                 <thead>
@@ -597,6 +609,7 @@
                   <option value="contract_override">Ajustes de contrato</option>
                   <option value="contract_override_clear">Ajustes removidos</option>
                   <option value="manual_layer_clear">Limpeza da camada HTML</option>
+                  <option value="recovery_restore">Recuperacoes</option>
                 </select>
                 <button id="refreshAuditButton" class="button secondary">Atualizar</button>
               </div>

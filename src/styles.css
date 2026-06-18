@@ -628,6 +628,26 @@ button {
   grid-template-columns: repeat(6, minmax(120px, 1fr));
 }
 
+.recovery-panel {
+  align-items: start;
+  background: linear-gradient(180deg, #fbfdff 0%, #f8fbff 100%);
+  border-bottom: 1px solid var(--line-soft);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(220px, 0.7fr) auto minmax(0, 1.8fr);
+}
+
+.recovery-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.recovery-summary {
+  grid-template-columns: repeat(6, minmax(100px, 1fr));
+}
+
 .summary-metric {
   background: #fbfdff;
   border: 1px solid var(--line-soft);
@@ -1542,6 +1562,10 @@ tbody tr:hover {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .recovery-panel {
+    grid-template-columns: 1fr;
+  }
+
   .audit-event-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1620,6 +1644,11 @@ tbody tr:hover {
   .installment-summary,
   .audit-event-summary {
     grid-template-columns: 1fr;
+  }
+
+  .recovery-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .panel-actions {
