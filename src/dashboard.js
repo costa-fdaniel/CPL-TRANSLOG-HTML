@@ -1795,17 +1795,34 @@ function renderDetail() {
   const systemImpact = contract.systemImpact || {};
   const principalImpact = (systemImpact.currentPrincipal || 0) + (systemImpact.nonCurrentPrincipal || 0);
   const interestImpact = (systemImpact.currentInterest || 0) + (systemImpact.nonCurrentInterest || 0);
+  const firstInstallment = stats.installments[0];
+  const lastInstallment = stats.installments[stats.installments.length - 1];
+  const nextInstallment = stats.installments.find((item) => item.status !== "paga");
+  const lifecycleState = contract.status === "quitado"
+    ? "Quitado"
+    : stats.pendingAfterSelection === 0
+      ? "Em conferencia"
+      : "Em aberto";
 
   els.detail.innerHTML = `
     <div class="contract-card">
       <div class="contract-card-head">
-        <div class="contract-card-title">Contratos</div>
-        <span class="index-pill">Index principal</span>
+        <div>
+          <div class="contract-card-title">Contrato selecionado</div>
+          <span class="contract-card-subtitle">${escapeHtml(contract.entity)} / ${escapeHtml(contract.type || "-")}</span>
+        </div>
+        <span class="index-pill">${escapeHtml(lifecycleState)}</span>
       </div>
 
       <div class="contract-id-box">
-        <span>No. contrato (ID)</span>
-        <strong>#${escapeHtml(contract.contractNumber)} <small>(${contract.id})</small></strong>
+        <div>
+          <span>No. contrato (ID)</span>
+          <strong>#${escapeHtml(contract.contractNumber)} <small>(${contract.id})</small></strong>
+        </div>
+        <div class="contract-id-meta">
+          <span>Saldo final</span>
+          <strong>${fmtMoney(contract.balances.finalDebt, true)}</strong>
+        </div>
       </div>
 
       <div class="contract-metrics">
@@ -1842,6 +1859,29 @@ function renderDetail() {
         <div class="progress-foot">
           <span>${stats.pendingAfterSelection} pendente(s) apos selecao</span>
           <span>${stats.queued} na esteira</span>
+        </div>
+      </div>
+
+      <div class="contract-lifecycle">
+        <div class="lifecycle-step is-complete">
+          <span>01</span>
+          <strong>Cadastro</strong>
+          <small>${firstInstallment ? `Inicio ${fmtDateBr(firstInstallment.date)}` : "Sem cronograma"}</small>
+        </div>
+        <div class="lifecycle-step ${stats.paid ? "is-complete" : ""}">
+          <span>02</span>
+          <strong>Pagamentos</strong>
+          <small>${stats.paid} parcela(s) reconhecida(s)</small>
+        </div>
+        <div class="lifecycle-step ${stats.pendingAfterSelection ? "is-active" : "is-complete"}">
+          <span>03</span>
+          <strong>Pendencias</strong>
+          <small>${stats.pendingAfterSelection} apos selecao</small>
+        </div>
+        <div class="lifecycle-step ${contract.status === "quitado" ? "is-complete" : ""}">
+          <span>04</span>
+          <strong>Proximo marco</strong>
+          <small>${nextInstallment ? `${fmtDateBr(nextInstallment.date)} / parc. ${escapeHtml(nextInstallment.parcel)}` : lastInstallment ? `Final ${fmtDateBr(lastInstallment.date)}` : "Sem vencimento"}</small>
         </div>
       </div>
 
@@ -2362,6 +2402,76 @@ function actionExplanation(action) {
   }[action] || "";
 }
 
+function transactionActionProfile(action) {
+  return {
+    payment: {
+      title: "Pagamento / amortizacao",
+      focus: "Baixa saldo e parcelas",
+      review: "Pronto se contas e valores baterem",
+      tone: "operation-green",
+    },
+    paid_installment_adjustment: {
+      title: "Ajuste de parcela paga",
+      focus: "Corrige parcela ja baixada",
+      review: "Exige conferencia da parcela marcada",
+      tone: "operation-amber",
+    },
+    interest_adjustment: {
+      title: "Ajuste de juros",
+      focus: "Movimenta juros contra resultado",
+      review: "Direcao define complemento ou reducao",
+      tone: "operation-blue",
+    },
+    liability_adjustment: {
+      title: "Ajuste do passivo",
+      focus: "Altera saldo C ou NC",
+      review: "Usa conta ponte e fica para revisar",
+      tone: "operation-amber",
+    },
+    liability_transfer_nc_current: {
+      title: "Transf. Passivo NC/C",
+      focus: "Reclassifica longo para curto prazo",
+      review: "Sem efeito no total da divida",
+      tone: "operation-blue",
+    },
+    interest_transfer_nc_current: {
+      title: "Transf. Juros Passivo NC/C",
+      focus: "Reclassifica juros NC/C",
+      review: "Sem efeito no total de juros",
+      tone: "operation-blue",
+    },
+    interest_reversal_dre: {
+      title: "Estorno de juros (DRE)",
+      focus: "Reduz juros reconhecidos a maior",
+      review: "Credito em resultado financeiro",
+      tone: "operation-red",
+    },
+    interest_complement_dre: {
+      title: "Complemento de juros (DRE)",
+      focus: "Reconhece juros faltantes",
+      review: "Debito em resultado financeiro",
+      tone: "operation-red",
+    },
+    settlement: {
+      title: "Quitacao",
+      focus: "Baixa contrato ou parcelas",
+      review: "Conferir saldo residual antes de exportar",
+      tone: "operation-green",
+    },
+    custom: {
+      title: "Lancamento manual",
+      focus: "Debito e credito informados pelo usuario",
+      review: "Sempre revisar antes do CSV",
+      tone: "operation-amber",
+    },
+  }[action] || {
+    title: "Acao selecionada",
+    focus: "Movimento operacional",
+    review: "Conferir previa contabil",
+    tone: "operation-blue",
+  };
+}
+
 function toggleTransactionFields() {
   const action = els.transactionActionSelect.value;
   const visible = {
@@ -2621,19 +2731,39 @@ function renderTransactionPanel() {
   if (!state.data) return;
   const contract = selectedTransactionContract();
   const action = els.transactionActionSelect.value;
+  const profile = transactionActionProfile(action);
   toggleTransactionFields();
   syncActionCards();
-  els.transactionExplanation.innerHTML = `<p>${escapeHtml(actionExplanation(action))}</p>`;
+  els.transactionExplanation.innerHTML = `
+    <div class="operation-brief ${profile.tone}">
+      <div>
+        <span>Acao selecionada</span>
+        <strong>${escapeHtml(profile.title)}</strong>
+        <p>${escapeHtml(actionExplanation(action))}</p>
+      </div>
+      <div class="operation-tags">
+        <em>${escapeHtml(profile.focus)}</em>
+        <em>${escapeHtml(profile.review)}</em>
+      </div>
+    </div>
+  `;
 
   if (contract) {
     const stats = contractInstallmentStats(contract);
+    const progress = stats.total ? Math.min(100, (stats.paid / stats.total) * 100) : 0;
+    const selectedAmount = stats.selectedAmount || 0;
     els.transactionContractSnapshot.innerHTML = `
+      <div class="snapshot-wide">
+        <span>Evolucao das parcelas</span>
+        <strong>${stats.paid}/${stats.total || stats.installments.length} pagas | ${stats.pendingAfterSelection} pendentes</strong>
+        <div class="mini-progress"><i style="width:${progress}%"></i></div>
+      </div>
       <div><span>Contrato</span><strong>${escapeHtml(contract.contractNumber)}</strong></div>
       <div><span>Status</span><strong>${escapeHtml(contract.status)}</strong></div>
       <div><span>Tipo</span><strong>${escapeHtml(contract.type || "-")}</strong></div>
       <div><span>Resultado</span><strong>${resultAccountFor(contract)}</strong></div>
-      <div><span>Parcelas</span><strong>${stats.paid}/${stats.total || stats.installments.length} pagas</strong></div>
-      <div><span>Pendentes</span><strong>${stats.pendingAfterSelection} apos selecao</strong></div>
+      <div><span>Saldo final</span><strong>${fmtMoney(contract.balances.finalDebt, true)}</strong></div>
+      <div><span>Selecionado</span><strong>${fmtMoney(selectedAmount, true)}</strong></div>
       <div><span>Circ.</span><strong>${escapeHtml(contract.accounts.circ || "-")}</strong></div>
       <div><span>N-Circ.</span><strong>${escapeHtml(contract.accounts.naoCirc || "-")}</strong></div>
       <div><span>Red. C</span><strong>${escapeHtml(contract.accounts.jurosCirc || "-")}</strong></div>

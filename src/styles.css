@@ -1007,11 +1007,74 @@ button:disabled {
   font-size: 14px;
   line-height: 1.45;
   margin-bottom: 18px;
-  padding: var(--space-7);
+  overflow: hidden;
+  padding: 0;
 }
 
 .explanation-box p {
   margin: 0;
+}
+
+.operation-brief {
+  border-left: 5px solid var(--blue);
+  display: grid;
+  gap: var(--space-5);
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.45fr);
+  padding: var(--space-7);
+}
+
+.operation-brief span {
+  color: var(--muted);
+  display: block;
+  font-size: 11px;
+  font-weight: 900;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+}
+
+.operation-brief strong {
+  color: var(--ink);
+  display: block;
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.operation-brief p {
+  color: var(--text);
+}
+
+.operation-tags {
+  align-content: start;
+  display: grid;
+  gap: 8px;
+}
+
+.operation-tags em {
+  background: #ffffff;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1.25;
+  padding: 8px 10px;
+}
+
+.operation-green {
+  border-left-color: var(--green);
+}
+
+.operation-amber {
+  border-left-color: #b45309;
+}
+
+.operation-red {
+  border-left-color: #b91c1c;
+}
+
+.operation-blue {
+  border-left-color: var(--blue);
 }
 
 .snapshot-grid {
@@ -1041,6 +1104,24 @@ button:disabled {
   font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.snapshot-grid .snapshot-wide {
+  grid-column: 1 / -1;
+}
+
+.mini-progress {
+  background: var(--surface-2);
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+}
+
+.mini-progress i {
+  background: linear-gradient(90deg, var(--green), var(--blue));
+  border-radius: inherit;
+  display: block;
+  height: 100%;
 }
 
 .transaction-preview-summary {
@@ -1921,6 +2002,14 @@ td:has(.pill) {
   text-transform: uppercase;
 }
 
+.contract-card-subtitle {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 3px;
+}
+
 .index-pill {
   background: var(--blue-soft);
   border-radius: 999px;
@@ -1937,6 +2026,7 @@ td:has(.pill) {
   border-radius: 8px;
   display: grid;
   gap: 8px;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.6fr);
   padding: 14px;
 }
 
@@ -1959,6 +2049,23 @@ td:has(.pill) {
 .contract-id-box small {
   color: var(--muted);
   font-size: 15px;
+}
+
+.contract-id-meta {
+  align-content: center;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(216, 230, 255, 0.9);
+  border-radius: 8px;
+  display: grid;
+  gap: 5px;
+  justify-items: end;
+  padding: 10px;
+  text-align: right;
+}
+
+.contract-id-meta strong {
+  color: var(--ink);
+  font-size: 16px;
 }
 
 .contract-metrics {
@@ -2023,6 +2130,64 @@ td:has(.pill) {
 .progress-foot {
   color: var(--muted);
   font-size: 12px;
+}
+
+.contract-lifecycle {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.lifecycle-step {
+  background: #ffffff;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  display: grid;
+  gap: 5px;
+  min-height: 86px;
+  padding: 10px;
+  position: relative;
+}
+
+.lifecycle-step::before {
+  background: #d9e4f1;
+  border-radius: 999px;
+  content: "";
+  height: 4px;
+  left: 10px;
+  position: absolute;
+  right: 10px;
+  top: -3px;
+}
+
+.lifecycle-step.is-complete::before {
+  background: var(--green);
+}
+
+.lifecycle-step.is-active {
+  background: #f8fbff;
+  border-color: #b8c9e4;
+}
+
+.lifecycle-step.is-active::before {
+  background: var(--blue);
+}
+
+.lifecycle-step span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.lifecycle-step strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.lifecycle-step small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.25;
 }
 
 .accounts-box {
@@ -2409,6 +2574,9 @@ td:has(.pill) {
   .snapshot-grid,
   .transaction-preview-summary,
   .contract-metrics,
+  .contract-id-box,
+  .contract-lifecycle,
+  .operation-brief,
   .installment-summary,
   .audit-event-summary {
     grid-template-columns: 1fr;
