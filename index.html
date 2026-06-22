@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>CPL TRANSLOG HTML</title>
-    <link rel="stylesheet" href="src/styles.css?v=20260619-contract-workflow">
+    <link rel="stylesheet" href="src/styles.css?v=20260622-filter-topbar">
   </head>
   <body>
     <div class="app-shell">
@@ -61,33 +61,52 @@
               </button>
             </nav>
 
-            <section class="global-filter-bar">
-              <div class="sidebar-section-title">Filtros globais</div>
-              <label>
-                <span>Busca geral</span>
-                <input id="searchInput" class="search" type="search" placeholder="Contrato, ID, tipo ou comentario">
-              </label>
-              <label>
-                <span>Status</span>
-                <select id="statusFilter" class="select" aria-label="Status">
-                  <option value="all">Todos os status</option>
-                  <option value="ativo">Ativos</option>
-                  <option value="quitado">Quitados</option>
-                </select>
-              </label>
-              <label>
-                <span>Empresa</span>
-                <select id="entityFilter" class="select" aria-label="Empresa">
-                  <option value="all">SAGA + TLOG</option>
-                  <option value="SAGA">SAGA</option>
-                  <option value="TLOG">TLOG</option>
-                </select>
-              </label>
-              <div id="activeFilterChips" class="active-filter-chips"></div>
-            </section>
           </aside>
 
           <section class="workspace-main">
+            <section class="filter-command-center" aria-label="Filtros da analise">
+              <div class="filter-command-head">
+                <div>
+                  <span class="eyebrow">Contexto da analise</span>
+                  <strong>Filtros principais</strong>
+                </div>
+                <div id="activeFilterChips" class="active-filter-chips"></div>
+              </div>
+              <div class="filter-command-grid">
+                <label class="filter-field search-field">
+                  <span>Busca geral</span>
+                  <input id="searchInput" class="search" type="search" placeholder="Contrato, ID, tipo ou comentario">
+                </label>
+                <label class="filter-field">
+                  <span>Status</span>
+                  <select id="statusFilter" class="select" aria-label="Status">
+                    <option value="all">Todos os status</option>
+                    <option value="ativo">Ativos</option>
+                    <option value="quitado">Quitados</option>
+                  </select>
+                </label>
+                <label class="filter-field">
+                  <span>Empresa</span>
+                  <select id="entityFilter" class="select" aria-label="Empresa">
+                    <option value="all">SAGA + TLOG</option>
+                    <option value="SAGA">SAGA</option>
+                    <option value="TLOG">TLOG</option>
+                  </select>
+                </label>
+                <label class="filter-field">
+                  <span>Ano do painel</span>
+                  <select id="panelYearFilter" class="select">
+                    <option value="all">Todos os anos</option>
+                  </select>
+                </label>
+                <label class="filter-field contract-field">
+                  <span>Contrato no painel</span>
+                  <select id="panelContractFilter" class="select">
+                    <option value="all">Todos os contratos</option>
+                  </select>
+                </label>
+              </div>
+            </section>
 
         <section id="panelTab" class="tab-panel active">
           <section class="view-header">
@@ -104,21 +123,6 @@
               <small>Filtros, indicadores e saldo atualizado do sistema.</small>
             </summary>
             <div class="section-content">
-              <section class="panel-filter-bar">
-                <label>
-                  <span>Ano do painel</span>
-                  <select id="panelYearFilter" class="select">
-                    <option value="all">Todos os anos</option>
-                  </select>
-                </label>
-                <label>
-                  <span>Contrato no painel</span>
-                  <select id="panelContractFilter" class="select">
-                    <option value="all">Todos os contratos</option>
-                  </select>
-                </label>
-              </section>
-
               <section id="kpis" class="kpi-grid"></section>
 
               <section id="panelSummary" class="panel-summary"></section>
@@ -946,6 +950,6 @@
       </main>
     </div>
 
-    <script src="src/dashboard.js?v=20260619-contract-workflow"></script>
+    <script src="src/dashboard.js?v=20260622-filter-topbar"></script>
   </body>
 </html>
