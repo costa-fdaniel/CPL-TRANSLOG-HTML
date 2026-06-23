@@ -84,11 +84,21 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build_client_release
 Saida local:
 
 ```text
-release/CPL TRANSLOG HTML - Cliente v1.0.0/
-release/CPL TRANSLOG HTML - Cliente v1.0.0.zip
+release/CPL TRANSLOG HTML - Cliente v1.1.0/
+release/CPL TRANSLOG HTML - Cliente v1.1.0.zip
 ```
 
 A pasta `release/` tambem fica fora do Git porque pode conter a base financeira processada embutida no executavel.
+
+### Refinamento visual v1.1.0
+
+A versao 1.1.0 formaliza:
+
+- padrao global de cores com escala Slate + Indigo;
+- tabelas responsivas em `.table-wrap`;
+- densidade corporativa de tabela em `0.813rem`;
+- preservacao dos `#id` estruturais usados pelo `dashboard.js`;
+- checklist de release e notas tecnicas em `docs/`.
 
 Para usar com carregamento automatico do JSON, rode um servidor local na pasta do projeto:
 

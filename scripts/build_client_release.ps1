@@ -24,6 +24,8 @@ New-Item -ItemType Directory -Force -Path (Join-Path $releaseDir "Suporte") | Ou
 Copy-Item -LiteralPath $exeSource -Destination $exeTarget
 Copy-Item -LiteralPath $manifestPath -Destination (Join-Path $releaseDir "manifesto.json")
 Copy-Item -LiteralPath (Join-Path $root "docs\manual-rapido-cliente.md") -Destination (Join-Path $releaseDir "Documentacao\Manual Rapido.md")
+Copy-Item -LiteralPath (Join-Path $root "docs\versao-1.1.0-refinamento.md") -Destination (Join-Path $releaseDir "Documentacao\Notas da Versao 1.1.0.md")
+Copy-Item -LiteralPath (Join-Path $root "docs\checklist-release-cliente.md") -Destination (Join-Path $releaseDir "Suporte\Checklist de Release.md")
 Copy-Item -LiteralPath (Join-Path $root ("Execut" + [char]0x00E1 + "vel\LEIA-ME.txt")) -Destination (Join-Path $releaseDir "LEIA-ME.txt")
 Copy-Item -LiteralPath (Join-Path $root "templates\modelo-importacao-lote.csv") -Destination (Join-Path $releaseDir "Modelos\Modelo Importacao Lote.csv")
 
@@ -40,6 +42,7 @@ Conteudo da entrega:
 - Exportacao CSV contabil
 - Pontos de recuperacao
 - Manual rapido e modelo CSV
+- Interface refinada com padrao Slate/Indigo, tabelas responsivas e densidade corporativa
 
 Observacao:
 Este pacote pode conter dados financeiros processados. Trate como arquivo confidencial.
