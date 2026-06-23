@@ -1208,6 +1208,12 @@ button:disabled {
   grid-template-columns: repeat(6, minmax(100px, 1fr));
 }
 
+.browser-storage-summary {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border-bottom: 1px solid var(--border-soft);
+  padding: var(--space-6) var(--space-8);
+}
+
 .summary-metric {
   background: #ffffff;
   border: 1px solid var(--line-soft);
@@ -1226,6 +1232,17 @@ button:disabled {
 .summary-metric strong {
   color: var(--ink);
   font-size: 16px;
+}
+
+.summary-metric.storage-warning {
+  border-color: #fed7aa;
+  grid-column: 1 / -1;
+}
+
+.summary-metric.storage-warning strong {
+  color: #9a3412;
+  font-size: 13px;
+  line-height: 1.35;
 }
 
 .installments-wrap {

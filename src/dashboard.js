@@ -14,13 +14,26 @@ const state = {
   auditEvents: [],
   operatorName: "",
   recoveryPoints: [],
+  browserStorage: {
+    backend: "localStorage",
+    savedAt: "",
+    loadedAt: "",
+    error: "",
+  },
 };
 
 const MANUAL_STORAGE_KEY = "cpl-translog-html-manual-entries";
 const LOCAL_STATE_STORAGE_KEY = "cpl-translog-html-local-state";
+const BROWSER_STATE_STORAGE_KEY = "cpl-translog-html-browser-state";
+const BROWSER_STORAGE_META_KEY = "cpl-translog-html-browser-meta";
 const OPERATOR_STORAGE_KEY = "cpl-translog-html-operator";
 const RECOVERY_STORAGE_KEY = "cpl-translog-html-recovery-points";
 const SYSTEM_STATE_SCHEMA = "cpl-translog-system-state";
+const BROWSER_DB_NAME = "cpl-translog-html-db";
+const BROWSER_DB_VERSION = 1;
+const BROWSER_DB_STORE = "records";
+const BROWSER_STATE_RECORD = "system-state";
+const BROWSER_RECOVERY_RECORD = "recovery-points";
 const API_BASE = "/api";
 
 const currency = new Intl.NumberFormat("pt-BR", {
@@ -136,11 +149,14 @@ const els = {
   manualTransactionsTable: document.querySelector("#manualTransactionsTable tbody"),
   exportManualLayerButton: document.querySelector("#exportManualLayerButton"),
   systemStateInput: document.querySelector("#systemStateInput"),
+  saveBrowserStateButton: document.querySelector("#saveBrowserStateButton"),
+  restoreBrowserStateButton: document.querySelector("#restoreBrowserStateButton"),
   clearManualLayerButton: document.querySelector("#clearManualLayerButton"),
   createRecoveryButton: document.querySelector("#createRecoveryButton"),
   downloadRecoveryButton: document.querySelector("#downloadRecoveryButton"),
   restoreRecoveryButton: document.querySelector("#restoreRecoveryButton"),
   recoverySummary: document.querySelector("#recoverySummary"),
+  browserStorageSummary: document.querySelector("#browserStorageSummary"),
   downloadBatchTemplateButton: document.querySelector("#downloadBatchTemplateButton"),
   batchCsvInput: document.querySelector("#batchCsvInput"),
   addBatchEntriesButton: document.querySelector("#addBatchEntriesButton"),
@@ -508,6 +524,206 @@ function localStatePayload() {
   };
 }
 
+function fallbackSystemStatePayload() {
+  const entries = state.manualEntries;
+  return {
+    schema: SYSTEM_STATE_SCHEMA,
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    operator: currentOperator(),
+    source: {
+      generatedAt: state.data?.metadata?.generatedAt || "",
+      sourceFile: state.data?.metadata?.sourceFile || "",
+      contracts: state.data?.contracts?.length || 0,
+    },
+    counts: {
+      entries: entries.length,
+      ready: entries.filter((entry) => entry.reviewStatus === "pronto").length,
+      review: entries.filter((entry) => entry.reviewStatus !== "pronto").length,
+      approved: entries.filter((entry) => entry.operationStatus === "aprovado").length,
+      exported: entries.filter((entry) => entry.operationStatus === "exportado").length,
+      draft: entries.filter((entry) => entry.operationStatus !== "aprovado" && entry.operationStatus !== "exportado").length,
+      operations: new Set(entries.map((entry) => entry.operationId).filter(Boolean)).size,
+      contractOverrides: Object.keys(state.contractOverrides).length,
+    },
+    entries,
+    contractOverrides: state.contractOverrides,
+    contractBalances: [],
+    auditTrail: entries,
+    operationalControl: {
+      summary: {},
+      findings: [],
+      reconciliation: [],
+    },
+  };
+}
+
+function durableSystemStatePayload() {
+  return state.data?.contracts?.length ? buildSystemStatePayload() : fallbackSystemStatePayload();
+}
+
+function browserDbAvailable() {
+  return typeof indexedDB !== "undefined";
+}
+
+let browserDbPromise = null;
+
+function openBrowserDb() {
+  if (!browserDbAvailable()) {
+    return Promise.reject(new Error("IndexedDB indisponivel neste navegador."));
+  }
+  if (browserDbPromise) return browserDbPromise;
+  browserDbPromise = new Promise((resolve, reject) => {
+    const request = indexedDB.open(BROWSER_DB_NAME, BROWSER_DB_VERSION);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(BROWSER_DB_STORE)) {
+        db.createObjectStore(BROWSER_DB_STORE, { keyPath: "key" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error("Falha ao abrir IndexedDB."));
+  });
+  return browserDbPromise;
+}
+
+async function putBrowserRecord(key, payload) {
+  const db = await openBrowserDb();
+  const record = {
+    key,
+    payload,
+    updatedAt: new Date().toISOString(),
+  };
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(BROWSER_DB_STORE, "readwrite");
+    tx.objectStore(BROWSER_DB_STORE).put(record);
+    tx.oncomplete = () => resolve(record);
+    tx.onerror = () => reject(tx.error || new Error("Falha ao salvar no navegador."));
+    tx.onabort = () => reject(tx.error || new Error("Salvamento no navegador cancelado."));
+  });
+}
+
+async function getBrowserRecord(key) {
+  const db = await openBrowserDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(BROWSER_DB_STORE, "readonly");
+    const request = tx.objectStore(BROWSER_DB_STORE).get(key);
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error || new Error("Falha ao ler estado do navegador."));
+  });
+}
+
+function saveBrowserMeta(meta) {
+  state.browserStorage = {
+    ...state.browserStorage,
+    ...meta,
+  };
+  try {
+    localStorage.setItem(BROWSER_STORAGE_META_KEY, JSON.stringify(state.browserStorage));
+  } catch {
+    // Metadados sao informativos; o estado operacional ja foi tratado na camada principal.
+  }
+  renderBrowserStorageSummary();
+}
+
+function loadBrowserMeta() {
+  try {
+    const meta = JSON.parse(localStorage.getItem(BROWSER_STORAGE_META_KEY) || "null");
+    if (meta && typeof meta === "object") {
+      state.browserStorage = { ...state.browserStorage, ...meta };
+    }
+  } catch {
+    state.browserStorage.error = "Nao foi possivel ler metadados locais.";
+  }
+}
+
+function tryWriteLocalStorage(key, payload) {
+  try {
+    localStorage.setItem(key, JSON.stringify(payload));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function saveBrowserState(options = {}) {
+  const payload = durableSystemStatePayload();
+  tryWriteLocalStorage(BROWSER_STATE_STORAGE_KEY, payload);
+  try {
+    const record = await putBrowserRecord(BROWSER_STATE_RECORD, payload);
+    saveBrowserMeta({
+      backend: "IndexedDB",
+      savedAt: record.updatedAt,
+      error: "",
+    });
+    if (!options.silent) {
+      els.status.textContent = `Estado salvo no navegador em ${auditEventTimeLabel(record.updatedAt)}.`;
+    }
+    return true;
+  } catch (error) {
+    const fallbackOk = tryWriteLocalStorage(BROWSER_STATE_STORAGE_KEY, payload);
+    saveBrowserMeta({
+      backend: fallbackOk ? "localStorage" : "indisponivel",
+      savedAt: fallbackOk ? new Date().toISOString() : state.browserStorage.savedAt,
+      error: fallbackOk ? "" : error.message,
+    });
+    if (!options.silent) {
+      els.status.textContent = fallbackOk
+        ? "IndexedDB indisponivel; estado salvo no localStorage do navegador."
+        : `Nao foi possivel salvar no navegador: ${error.message}`;
+    }
+    return fallbackOk;
+  }
+}
+
+async function readBrowserStatePayload() {
+  try {
+    const record = await getBrowserRecord(BROWSER_STATE_RECORD);
+    if (record?.payload) {
+      saveBrowserMeta({
+        backend: "IndexedDB",
+        loadedAt: new Date().toISOString(),
+        savedAt: record.updatedAt || record.payload.exportedAt || state.browserStorage.savedAt,
+        error: "",
+      });
+      return record.payload;
+    }
+  } catch (error) {
+    saveBrowserMeta({
+      backend: "localStorage",
+      error: error.message,
+    });
+  }
+
+  try {
+    const payload = JSON.parse(localStorage.getItem(BROWSER_STATE_STORAGE_KEY) || "null");
+    if (payload && typeof payload === "object") {
+      saveBrowserMeta({
+        backend: "localStorage",
+        loadedAt: new Date().toISOString(),
+        savedAt: payload.exportedAt || state.browserStorage.savedAt,
+      });
+      return payload;
+    }
+  } catch {
+    // O fallback legado abaixo ainda pode recuperar entradas simples.
+  }
+  return null;
+}
+
+async function restoreBrowserState() {
+  const payload = await readBrowserStatePayload();
+  if (!payload || !isSystemStatePayload(payload)) {
+    els.status.textContent = "Nenhum estado valido salvo no navegador para restaurar.";
+    return;
+  }
+  const ok = window.confirm("Restaurar o estado salvo no navegador? A camada HTML atual sera substituida.");
+  if (!ok) return;
+  createRecoveryPoint("antes de restaurar estado do navegador", { silent: true });
+  importSystemState(payload);
+  els.status.textContent = `Estado do navegador restaurado: ${state.manualEntries.length} transacao(oes) HTML.`;
+}
+
 async function apiJson(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
@@ -705,12 +921,24 @@ async function refreshBackendAuditEvents(options = {}) {
 function saveManualEntries(options = {}) {
   localStorage.setItem(LOCAL_STATE_STORAGE_KEY, JSON.stringify(localStatePayload()));
   localStorage.setItem(MANUAL_STORAGE_KEY, JSON.stringify(state.manualEntries));
+  saveBrowserState({ silent: true }).catch(() => {
+    // O localStorage legado acima continua preservando a camada operacional.
+  });
   if (options.sync !== false) {
     persistStateToServer();
   }
 }
 
-function loadRecoveryPoints() {
+async function loadRecoveryPoints() {
+  try {
+    const record = await getBrowserRecord(BROWSER_RECOVERY_RECORD);
+    if (Array.isArray(record?.payload)) {
+      state.recoveryPoints = record.payload;
+      return;
+    }
+  } catch {
+    // Se IndexedDB nao estiver disponivel, usa o localStorage legado abaixo.
+  }
   try {
     const points = JSON.parse(localStorage.getItem(RECOVERY_STORAGE_KEY) || "[]");
     state.recoveryPoints = Array.isArray(points) ? points : [];
@@ -720,7 +948,11 @@ function loadRecoveryPoints() {
 }
 
 function saveRecoveryPoints() {
-  localStorage.setItem(RECOVERY_STORAGE_KEY, JSON.stringify(state.recoveryPoints.slice(0, 10)));
+  const points = state.recoveryPoints.slice(0, 10);
+  localStorage.setItem(RECOVERY_STORAGE_KEY, JSON.stringify(points));
+  putBrowserRecord(BROWSER_RECOVERY_RECORD, points).catch(() => {
+    // Recuperacoes permanecem no localStorage quando IndexedDB nao estiver disponivel.
+  });
 }
 
 function latestRecoveryPoint() {
@@ -784,8 +1016,16 @@ function restoreLatestRecoveryPoint() {
   els.status.textContent = `Ponto de recuperacao restaurado por ${operator}.`;
 }
 
-function loadManualEntries() {
+async function loadManualEntries() {
   try {
+    const browserPayload = await readBrowserStatePayload();
+    if (browserPayload && typeof browserPayload === "object") {
+      state.manualEntries = Array.isArray(browserPayload.entries) ? browserPayload.entries : [];
+      state.contractOverrides = browserPayload.contractOverrides && typeof browserPayload.contractOverrides === "object"
+        ? browserPayload.contractOverrides
+        : {};
+      return;
+    }
     const storedState = JSON.parse(localStorage.getItem(LOCAL_STATE_STORAGE_KEY) || "null");
     if (storedState && typeof storedState === "object") {
       state.manualEntries = Array.isArray(storedState.entries) ? storedState.entries : [];
@@ -1148,14 +1388,14 @@ async function loadDefaultData() {
     const response = await fetch("data/processed/dashboard.json", { cache: "no-store" });
     if (!response.ok) throw new Error("JSON nao encontrado");
     const data = await response.json();
-    setData(data, "data/processed/dashboard.json");
+    await setData(data, "data/processed/dashboard.json");
   } catch {
     els.status.textContent = "Nenhum JSON carregado. Gere data/processed/dashboard.json ou selecione um arquivo JSON.";
     renderEmpty();
   }
 }
 
-function setData(data, sourceLabel) {
+async function setData(data, sourceLabel) {
   data.ledgerEntries = data.ledgerEntries || [];
   state.data = data;
   state.selectedId = data.contracts?.[0]?.id ?? null;
@@ -1163,7 +1403,7 @@ function setData(data, sourceLabel) {
   state.selectedInstallmentKeys.clear();
   state.transactionDraftEntries = [];
   state.panelControlsInitialized = false;
-  loadManualEntries();
+  await loadManualEntries();
   els.status.textContent = `${sourceLabel} | ${data.totals.contracts} contratos | gerado em ${data.metadata.generatedAt}`;
   if (state.pendingSystemState) {
     els.status.textContent += ` | estado aplicado: ${state.manualEntries.length} transacoes HTML`;
@@ -1369,6 +1609,7 @@ function renderEmpty() {
   els.transactionSimulationTable.innerHTML = "";
   els.manualTransactionsTable.innerHTML = "";
   els.recoverySummary.innerHTML = "";
+  if (els.browserStorageSummary) els.browserStorageSummary.innerHTML = "";
   els.paymentInstallmentSummary.innerHTML = "";
   els.paymentInstallmentsTable.innerHTML = "";
   els.batchImportSummary.innerHTML = "";
@@ -2863,7 +3104,30 @@ function renderManualTransactions() {
     .join("") || `<tr><td colspan="9" class="empty-cell">Nenhuma transacao adicionada nesta camada local.</td></tr>`;
 }
 
+function renderBrowserStorageSummary() {
+  if (!els.browserStorageSummary) return;
+  const savedAt = state.browserStorage.savedAt
+    ? auditEventTimeLabel(state.browserStorage.savedAt)
+    : "Ainda nao salvo";
+  const loadedAt = state.browserStorage.loadedAt
+    ? auditEventTimeLabel(state.browserStorage.loadedAt)
+    : "-";
+  const backend = state.browserStorage.backend || (browserDbAvailable() ? "IndexedDB" : "localStorage");
+  const serverMode = window.location.protocol.startsWith("http") ? "SQLite ativo" : "Somente browser";
+  const error = state.browserStorage.error || "";
+  els.browserStorageSummary.innerHTML = `
+    <div class="summary-metric"><span>Salvamento browser</span><strong>${escapeHtml(backend)}</strong></div>
+    <div class="summary-metric"><span>Ultimo autosave</span><strong>${escapeHtml(savedAt)}</strong></div>
+    <div class="summary-metric"><span>Ultima leitura</span><strong>${escapeHtml(loadedAt)}</strong></div>
+    <div class="summary-metric"><span>Transacoes HTML</span><strong>${state.manualEntries.length}</strong></div>
+    <div class="summary-metric"><span>Ajustes contrato</span><strong>${Object.keys(state.contractOverrides).length}</strong></div>
+    <div class="summary-metric"><span>Servidor local</span><strong>${escapeHtml(serverMode)}</strong></div>
+    ${error ? `<div class="summary-metric storage-warning"><span>Aviso</span><strong>${escapeHtml(error)}</strong></div>` : ""}
+  `;
+}
+
 function renderRecoveryPanel() {
+  renderBrowserStorageSummary();
   const point = latestRecoveryPoint();
   const entries = point?.counts?.entries || 0;
   const overrides = point?.counts?.contractOverrides || 0;
@@ -3662,7 +3926,7 @@ els.fileInput.addEventListener("change", async (event) => {
     if (isSystemStatePayload(payload)) {
       importSystemState(payload);
     } else if (isDashboardPayload(payload)) {
-      setData(payload, file.name);
+      await setData(payload, file.name);
     } else {
       els.status.textContent = importErrorMessage(file.name, payload);
     }
@@ -3797,6 +4061,8 @@ els.simulateTransactionButton.addEventListener("click", () => {
 els.addTransactionButton.addEventListener("click", addDraftTransactionToLedger);
 els.exportManualLayerButton.addEventListener("click", exportManualLayer);
 els.systemStateInput.addEventListener("change", handleSystemStateImport);
+els.saveBrowserStateButton.addEventListener("click", () => saveBrowserState({ force: true }));
+els.restoreBrowserStateButton.addEventListener("click", restoreBrowserState);
 els.clearManualLayerButton.addEventListener("click", clearManualLayer);
 els.createRecoveryButton.addEventListener("click", () => createRecoveryPoint("manual"));
 els.downloadRecoveryButton.addEventListener("click", () => downloadRecoveryPoint());
@@ -3809,6 +4075,12 @@ els.batchCsvInput.addEventListener("change", handleBatchCsvImport);
 els.addBatchEntriesButton.addEventListener("click", addBatchEntriesToLedger);
 els.clearBatchImportButton.addEventListener("click", clearBatchImport);
 
-loadOperator();
-loadRecoveryPoints();
-loadDefaultData();
+async function bootstrap() {
+  loadOperator();
+  loadBrowserMeta();
+  await loadRecoveryPoints();
+  renderBrowserStorageSummary();
+  await loadDefaultData();
+}
+
+bootstrap();
