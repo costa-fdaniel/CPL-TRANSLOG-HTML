@@ -1,0 +1,12 @@
+{
+  "product": "CPL TRANSLOG HTML",
+  "version": "1.0.0",
+  "buildDate": "2026-06-23",
+  "mode": "windows-packaged-app",
+  "description": "Sistema local para contratos, parcelas, lancamentos, CRUD local, importacao JSON e exportacao CSV contabil.",
+  "dataPolicy": {
+    "processedDataEmbeddedInPackage": true,
+    "rawDataIncluded": false,
+    "gitPublishesPackagedExe": false
+  }
+}

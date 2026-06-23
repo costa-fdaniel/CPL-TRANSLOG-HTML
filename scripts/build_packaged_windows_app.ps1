@@ -23,6 +23,7 @@ try {
   New-Item -ItemType Directory -Force -Path (Join-Path $staging "data\processed") | Out-Null
 
   Copy-Item -LiteralPath (Join-Path $root "index.html") -Destination (Join-Path $staging "index.html")
+  Copy-Item -LiteralPath (Join-Path $root "app-manifest.json") -Destination (Join-Path $staging "app-manifest.json")
   Copy-Item -LiteralPath (Join-Path $root "src\dashboard.js") -Destination (Join-Path $staging "src\dashboard.js")
   Copy-Item -LiteralPath (Join-Path $root "src\styles.css") -Destination (Join-Path $staging "src\styles.css")
 

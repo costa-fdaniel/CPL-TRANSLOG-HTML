@@ -4,6 +4,13 @@ using System.IO;
 using System.IO.Compression;
 using System.Reflection;
 
+[assembly: AssemblyTitle("CPL TRANSLOG HTML")]
+[assembly: AssemblyDescription("Sistema local de contratos, lancamentos e CRUD operacional")]
+[assembly: AssemblyCompany("CPL TRANSLOG")]
+[assembly: AssemblyProduct("CPL TRANSLOG HTML")]
+[assembly: AssemblyVersion("1.0.0.0")]
+[assembly: AssemblyFileVersion("1.0.0.0")]
+
 internal static class Program
 {
     private const string ResourceName = "TranslogAppPackage";
@@ -12,7 +19,9 @@ internal static class Program
     {
         try
         {
+            EnsureOperationalFolders();
             string appDir = ExtractAppPackage();
+            WriteLog("App package extracted to " + appDir);
             string indexFile = Path.Combine(appDir, "index.html");
             if (!File.Exists(indexFile))
             {
@@ -21,22 +30,52 @@ internal static class Program
             }
 
             OpenAppWindow(new Uri(indexFile).AbsoluteUri, appDir);
+            WriteLog("App window requested.");
             return 0;
         }
         catch (Exception ex)
         {
+            WriteLog("ERROR: " + ex);
             ShowError("Nao foi possivel abrir o CPL TRANSLOG HTML.", ex.Message);
             return 2;
         }
     }
 
+    private static string ProductRoot()
+    {
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "CPL TRANSLOG HTML"
+        );
+    }
+
+    private static void EnsureOperationalFolders()
+    {
+        string root = ProductRoot();
+        Directory.CreateDirectory(root);
+        Directory.CreateDirectory(Path.Combine(root, "App"));
+        Directory.CreateDirectory(Path.Combine(root, "Dados"));
+        Directory.CreateDirectory(Path.Combine(root, "Backups"));
+        Directory.CreateDirectory(Path.Combine(root, "Exportacoes"));
+        Directory.CreateDirectory(Path.Combine(root, "Logs"));
+    }
+
+    private static void WriteLog(string message)
+    {
+        try
+        {
+            string logPath = Path.Combine(ProductRoot(), "Logs", "startup.log");
+            File.AppendAllText(logPath, DateTime.Now.ToString("s") + " " + message + Environment.NewLine);
+        }
+        catch
+        {
+            // Logging must never block the app.
+        }
+    }
+
     private static string ExtractAppPackage()
     {
-        string baseDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "CPL TRANSLOG HTML",
-            "App"
-        );
+        string baseDir = Path.Combine(ProductRoot(), "App");
 
         if (Directory.Exists(baseDir))
         {

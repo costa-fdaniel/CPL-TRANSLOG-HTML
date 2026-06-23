@@ -16,3 +16,4 @@ Observacoes:
 - Este modo nao inicia servidor local nem usa a porta 8765.
 - O modo SQLite/API continua existindo apenas como opcional tecnico pelo script scripts/server.py.
 - Para gerar o pacote pesado: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build_packaged_windows_app.ps1
+- Para gerar a entrega completa ao cliente: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build_client_release.ps1

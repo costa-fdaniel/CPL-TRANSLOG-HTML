@@ -1,0 +1,11 @@
+tipo;contrato_id;data;parcelas;valor;debito;credito;quitou;alvo;direcao;observacao
+pagamento;2;2026-06-20;48;;;;N;current;;Pagamento de parcela
+pagamento;108;2026-07-10;45,46,47;;;;N;current;;Pagamento de varias parcelas
+quitacao;136;2026-06-30;41-45;;;;S;current;;Quitacao por parcelas
+ajuste_juros;157;2026-06-30;;1500,00;;;N;both;increase;Ajuste de juros
+ajuste_passivo;157;2026-06-30;;1000,00;;;N;current;decrease;Ajuste do passivo
+transf_passivo_nc_c;157;2026-06-30;;1000,00;;;N;;;Transferencia de passivo NC/C
+transf_juros_nc_c;157;2026-06-30;;1000,00;;;N;;;Transferencia de juros NC/C
+estorno_juros_dre;157;2026-06-30;;1000,00;;;N;both;;Estorno de juros DRE
+complemento_juros_dre;157;2026-06-30;;1000,00;;;N;both;;Complemento de juros DRE
+manual;2;2026-06-20;;95316,10;7543;000;N;;;Lancamento manual

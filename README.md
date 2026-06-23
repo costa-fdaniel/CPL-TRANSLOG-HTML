@@ -73,6 +73,23 @@ Executável/CPL TRANSLOG HTML - Pacote.exe
 
 Esse arquivo pode ficar com varios MB porque embute o app e o JSON processado. Por conter dados financeiros processados, ele fica fora do Git pelo `.gitignore`.
 
+### Pacote final do cliente
+
+Para gerar uma pasta final de entrega com executavel, manual, modelo CSV, manifesto, changelog, orientacoes de suporte, checksums e ZIP:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build_client_release.ps1
+```
+
+Saida local:
+
+```text
+release/CPL TRANSLOG HTML - Cliente v1.0.0/
+release/CPL TRANSLOG HTML - Cliente v1.0.0.zip
+```
+
+A pasta `release/` tambem fica fora do Git porque pode conter a base financeira processada embutida no executavel.
+
 Para usar com carregamento automatico do JSON, rode um servidor local na pasta do projeto:
 
 ```powershell

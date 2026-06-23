@@ -16,3 +16,4 @@ __pycache__/
 
 # Local packaged executable may embed financial processed data.
 Executável/CPL TRANSLOG HTML - Pacote.exe
+release/
