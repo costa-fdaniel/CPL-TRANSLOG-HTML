@@ -1404,6 +1404,10 @@ function scaledInstallmentAmount(value, installment, selectedTotal) {
 }
 
 async function loadDefaultData() {
+  if (window.TRANSLOG_DASHBOARD_DATA && isDashboardPayload(window.TRANSLOG_DASHBOARD_DATA)) {
+    await setData(window.TRANSLOG_DASHBOARD_DATA, "base embutida no executavel");
+    return;
+  }
   try {
     const response = await fetch("data/processed/dashboard.json", { cache: "no-store" });
     if (!response.ok) throw new Error("JSON nao encontrado");

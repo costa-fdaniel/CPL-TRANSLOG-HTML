@@ -57,6 +57,22 @@ Para recriar o executavel:
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build_windows_launcher.ps1
 ```
 
+### Executavel empacotado
+
+Quando for necessario entregar um `.exe` maior contendo os arquivos do app e a base processada `data/processed/dashboard.json`, gere o pacote local:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build_packaged_windows_app.ps1
+```
+
+Saida:
+
+```text
+Executável/CPL TRANSLOG HTML - Pacote.exe
+```
+
+Esse arquivo pode ficar com varios MB porque embute o app e o JSON processado. Por conter dados financeiros processados, ele fica fora do Git pelo `.gitignore`.
+
 Para usar com carregamento automatico do JSON, rode um servidor local na pasta do projeto:
 
 ```powershell

@@ -13,3 +13,6 @@ _tmp_*.xlsx
 # Python cache.
 __pycache__/
 *.pyc
+
+# Local packaged executable may embed financial processed data.
+Executável/CPL TRANSLOG HTML - Pacote.exe

@@ -1,5 +1,9 @@
 CPL TRANSLOG HTML - Executavel Windows
 
+Arquivos:
+- "CPL TRANSLOG HTML.exe": lancador leve, abre o app direto da pasta do projeto.
+- "CPL TRANSLOG HTML - Pacote.exe": pacote pesado gerado localmente, com app e base processada embutidos.
+
 Use:
 1. Dê dois cliques em "CPL TRANSLOG HTML.exe".
 2. O sistema abre direto em uma janela de aplicativo do Windows, sem abas ou barra de endereco.
@@ -11,3 +15,4 @@ Observacoes:
 - A importacao JSON, o CRUD local do navegador e os salvamentos continuam funcionando normalmente.
 - Este modo nao inicia servidor local nem usa a porta 8765.
 - O modo SQLite/API continua existindo apenas como opcional tecnico pelo script scripts/server.py.
+- Para gerar o pacote pesado: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build_packaged_windows_app.ps1
