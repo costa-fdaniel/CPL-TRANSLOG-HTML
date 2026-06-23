@@ -68,6 +68,17 @@ O banco guarda:
 - trilha de auditoria;
 - lotes de exportacao CSV.
 
+### API CRUD local
+
+No modo `scripts/server.py`, o sistema tambem expoe operacoes CRUD explicitas sobre o SQLite:
+
+- `Create`: `POST /api/ledger-entries` cria varios lancamentos HTML; `PUT /api/ledger-entries/{id}` cria ou atualiza um lancamento individual.
+- `Read`: `GET /api/ledger-entries` lista lancamentos; `GET /api/ledger-entries/{id}` le um lancamento; `GET /api/contract-overrides` le ajustes de cadastro.
+- `Update`: `PUT /api/ledger-entries/{id}` atualiza status, aprovacao, exportacao ou dados do lancamento; `PUT /api/contract-overrides/{contractId}` atualiza cadastro local do contrato.
+- `Delete`: `DELETE /api/ledger-entries/{id}` exclui um lancamento HTML; `DELETE /api/contract-overrides/{contractId}` remove o ajuste local do contrato.
+
+A importacao/exportacao JSON continua existindo como backup e portabilidade. O CRUD e a camada JSON convivem: o JSON alimenta ou restaura o estado, enquanto as operacoes diarias gravam registros individuais no banco local.
+
 Se o HTML for aberto fora desse servidor, o sistema continua funcionando com `localStorage` e arquivos JSON.
 
 Os arquivos em `data/raw/` e `data/processed/` ficam fora do Git por conterem dados financeiros sensiveis.

@@ -782,7 +782,27 @@ async function hydrateStateFromServer() {
   if (!window.location.protocol.startsWith("http")) return false;
   try {
     const response = await apiJson("/state");
-    if (!response?.found || !response.payload) return false;
+    if (!response?.found || !response.payload) {
+      const [entriesResponse, overridesResponse] = await Promise.all([
+        apiJson("/ledger-entries").catch(() => ({ items: [] })),
+        apiJson("/contract-overrides").catch(() => ({ items: {} })),
+      ]);
+      const entries = Array.isArray(entriesResponse.items) ? entriesResponse.items : [];
+      const contractOverrides = overridesResponse.items && typeof overridesResponse.items === "object"
+        ? overridesResponse.items
+        : {};
+      if (!entries.length && !Object.keys(contractOverrides).length) return false;
+      importSystemState({
+        schema: SYSTEM_STATE_SCHEMA,
+        version: 2,
+        exportedAt: new Date().toISOString(),
+        operator: currentOperator(),
+        entries,
+        contractOverrides,
+      }, { sync: false, source: "crud" });
+      els.status.textContent += ` | CRUD SQLite aplicado (${entries.length} transacoes)`;
+      return true;
+    }
     importSystemState(response.payload, { sync: false, source: "server" });
     els.status.textContent += ` | estado SQLite aplicado (${response.updatedAt})`;
     return true;
@@ -2230,6 +2250,7 @@ function saveContractOverride() {
     },
   };
   state.contractOverrides[String(original.id)] = override;
+  syncContractOverrideCrud(original.id, override);
   postAuditEvent("contract_override", String(original.id), {
     operator,
     contractId: original.id,
@@ -2248,6 +2269,7 @@ function clearContractOverride() {
   if (!operator) return;
   const contract = state.data?.contracts?.find((item) => item.id === state.selectedId);
   delete state.contractOverrides[String(state.selectedId)];
+  deleteContractOverrideCrud(state.selectedId);
   postAuditEvent("contract_override_clear", String(state.selectedId), {
     operator,
     contractId: state.selectedId,
@@ -3473,6 +3495,54 @@ function postAuditEvent(eventType, refId, payload) {
     .catch(() => {});
 }
 
+function syncLedgerCrud(entries, method = "PUT") {
+  if (!window.location.protocol.startsWith("http")) return;
+  const list = Array.isArray(entries) ? entries : [entries];
+  if (!list.length) return;
+  if (method === "POST") {
+    apiJson("/ledger-entries", {
+      method: "POST",
+      body: JSON.stringify({ items: list }),
+    })
+      .then(() => refreshBackendAuditEvents({ silent: true }))
+      .catch(() => {});
+    return;
+  }
+  list.forEach((entry) => {
+    if (!entry?.id) return;
+    apiJson(`/ledger-entries/${encodeURIComponent(entry.id)}`, {
+      method: "PUT",
+      body: JSON.stringify(entry),
+    }).catch(() => {});
+  });
+}
+
+function deleteLedgerCrud(entryIds) {
+  if (!window.location.protocol.startsWith("http")) return;
+  const ids = Array.isArray(entryIds) ? entryIds : [entryIds];
+  ids.forEach((entryId) => {
+    if (!entryId) return;
+    apiJson(`/ledger-entries/${encodeURIComponent(entryId)}`, { method: "DELETE" }).catch(() => {});
+  });
+}
+
+function syncContractOverrideCrud(contractId, override) {
+  if (!window.location.protocol.startsWith("http")) return;
+  apiJson(`/contract-overrides/${encodeURIComponent(String(contractId))}`, {
+    method: "PUT",
+    body: JSON.stringify(override),
+  })
+    .then(() => refreshBackendAuditEvents({ silent: true }))
+    .catch(() => {});
+}
+
+function deleteContractOverrideCrud(contractId) {
+  if (!window.location.protocol.startsWith("http")) return;
+  apiJson(`/contract-overrides/${encodeURIComponent(String(contractId))}`, { method: "DELETE" })
+    .then(() => refreshBackendAuditEvents({ silent: true }))
+    .catch(() => {});
+}
+
 function updateSelectedManualStatus(status) {
   const selected = selectedManualEntries();
   if (!selected.length) {
@@ -3499,6 +3569,7 @@ function updateSelectedManualStatus(status) {
       ],
     };
   });
+  syncLedgerCrud(state.manualEntries.filter((entry) => ids.has(entry.id)));
   postAuditEvent("ledger_status", status, {
     operator,
     entryIds: [...ids],
@@ -3606,6 +3677,7 @@ function exportLedgerCsv() {
         ? { ...entry, operationStatus: "exportado", exportedAt, exportedBy: operator, exportBatchId }
         : entry
     ));
+    syncLedgerCrud(state.manualEntries.filter((entry) => exportedManualIds.has(entry.id)));
     saveManualEntries();
     populatePanelControls();
     populateLedgerControls();
@@ -3635,6 +3707,7 @@ function addDraftTransactionToLedger() {
   }));
   entries.forEach((entry) => state.selectedLedgerIds.add(entry.id));
   state.manualEntries.push(...entries);
+  syncLedgerCrud(entries, "POST");
   saveManualEntries();
   state.transactionDraftEntries = [];
   state.selectedInstallmentKeys.clear();
@@ -3726,10 +3799,14 @@ function clearManualLayer() {
   if (!operator) return;
   const clearedEntries = state.manualEntries.length;
   const clearedOverrides = Object.keys(state.contractOverrides).length;
+  const clearedEntryIds = state.manualEntries.map((entry) => entry.id);
+  const clearedOverrideIds = Object.keys(state.contractOverrides);
   createRecoveryPoint("antes de limpar camada HTML", { silent: true });
   state.manualEntries = [];
   state.contractOverrides = {};
   state.selectedLedgerIds.clear();
+  deleteLedgerCrud(clearedEntryIds);
+  clearedOverrideIds.forEach((contractId) => deleteContractOverrideCrud(contractId));
   postAuditEvent("manual_layer_clear", "system_state", {
     operator,
     clearedEntries,
@@ -3763,6 +3840,12 @@ function importSystemState(payload, options = {}) {
   state.selectedInstallmentKeys.clear();
   state.transactionDraftEntries = [];
   state.batchImportRows = [];
+  if (options.sync !== false) {
+    syncLedgerCrud(state.manualEntries, "POST");
+    Object.entries(state.contractOverrides).forEach(([contractId, override]) => {
+      syncContractOverrideCrud(contractId, override);
+    });
+  }
   saveManualEntries({ sync: options.sync !== false });
   if (!state.data?.contracts?.length) {
     state.pendingSystemState = payload;
@@ -3773,7 +3856,12 @@ function importSystemState(payload, options = {}) {
   populateLedgerControls();
   applyFilters();
   renderTransactionPanel();
-  els.status.textContent = `${els.status.textContent} | estado ${options.source === "server" ? "SQLite" : "importado"}: ${state.manualEntries.length} transacoes HTML`;
+  const sourceLabel = options.source === "server"
+    ? "SQLite"
+    : options.source === "crud"
+      ? "CRUD SQLite"
+      : "importado";
+  els.status.textContent = `${els.status.textContent} | estado ${sourceLabel}: ${state.manualEntries.length} transacoes HTML`;
 }
 
 async function handleSystemStateImport(event) {
@@ -3892,6 +3980,7 @@ function addBatchEntriesToLedger() {
   }));
   entries.forEach((entry) => state.selectedLedgerIds.add(entry.id));
   state.manualEntries.push(...entries);
+  syncLedgerCrud(entries, "POST");
   state.batchImportRows = [];
   if (els.batchCsvInput) els.batchCsvInput.value = "";
   saveManualEntries();
