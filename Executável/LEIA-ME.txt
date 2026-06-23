@@ -1,0 +1,12 @@
+CPL TRANSLOG HTML - Executavel Windows
+
+Use:
+1. Dê dois cliques em "CPL TRANSLOG HTML.exe".
+2. O sistema inicia o servidor local em http://127.0.0.1:8765/.
+3. O navegador padrao do Windows sera aberto automaticamente.
+
+Observacoes:
+- Mantenha esta pasta Executavel dentro da pasta principal do projeto TRANSLOG.
+- O Python precisa estar instalado e disponivel no Windows.
+- A importacao JSON e os salvamentos do navegador continuam funcionando normalmente.
+- Para encerrar o servidor local, feche os processos python pelo Gerenciador de Tarefas, se necessario.
