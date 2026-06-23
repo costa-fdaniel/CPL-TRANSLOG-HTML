@@ -2,12 +2,12 @@ CPL TRANSLOG HTML - Executavel Windows
 
 Use:
 1. Dê dois cliques em "CPL TRANSLOG HTML.exe".
-2. O sistema inicia o servidor local em http://127.0.0.1:8765/.
-3. O sistema abre em uma janela de aplicativo do Windows, sem abas ou barra de endereco.
+2. O sistema abre direto em uma janela de aplicativo do Windows, sem abas ou barra de endereco.
+3. Use "Carregar JSON" dentro do app quando quiser importar ou atualizar a base.
 
 Observacoes:
 - Mantenha esta pasta Executavel dentro da pasta principal do projeto TRANSLOG.
-- O Python precisa estar instalado e disponivel no Windows.
 - O executavel usa Microsoft Edge ou Google Chrome em modo aplicativo para preservar os recursos modernos do HTML.
-- A importacao JSON e os salvamentos do navegador continuam funcionando normalmente.
-- Para encerrar o servidor local, feche os processos python pelo Gerenciador de Tarefas, se necessario.
+- A importacao JSON, o CRUD local do navegador e os salvamentos continuam funcionando normalmente.
+- Este modo nao inicia servidor local nem usa a porta 8765.
+- O modo SQLite/API continua existindo apenas como opcional tecnico pelo script scripts/server.py.

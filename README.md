@@ -32,7 +32,30 @@ python -m pip install -r requirements.txt
 python scripts/extract_dashboard_data.py "data/raw/CPL SAGA - Financiamentos 2024—2026 (shared) 3.xlsb"
 ```
 
-4. Abra `index.html` no navegador.
+4. Abra pelo executavel Windows ou pelo `index.html`.
+
+## Executavel Windows
+
+O modo recomendado para uso operacional no Windows fica em:
+
+```text
+Executável/CPL TRANSLOG HTML.exe
+```
+
+Esse executavel abre o sistema em uma janela de aplicativo, sem abas ou barra de endereco, carregando o `index.html` direto da pasta do projeto. Ele nao inicia servidor local e nao usa a porta `8765`.
+
+Nesse modo, os dados operacionais ficam no proprio ambiente do aplicativo:
+
+- importacao manual de JSON pela interface;
+- CRUD local via IndexedDB/localStorage do navegador-app;
+- exportacao/importacao de estado JSON como backup;
+- pontos de recuperacao locais.
+
+Para recriar o executavel:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build_windows_launcher.ps1
+```
 
 Para usar com carregamento automatico do JSON, rode um servidor local na pasta do projeto:
 
